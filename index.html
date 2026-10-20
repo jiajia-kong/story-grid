@@ -64,13 +64,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .secHead{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;justify-content:space-between;padding-top:4px}
 .secHead .ttl{display:flex;flex-direction:column;gap:2px}
 h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;margin:0;letter-spacing:-.005em}
-.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));border-top:1px solid var(--ink);border-left:1px solid var(--ink)}
-.ctl{display:flex;flex-direction:column;gap:9px;min-width:0;padding:14px 16px;border-right:1px solid var(--ink);border-bottom:1px solid var(--ink)}
-.ctl>.lbl{font-family:var(--f-serif);font-weight:750;font-size:18px}
-.seg{display:flex;flex-wrap:wrap;gap:4px}
 .seg label{position:relative}
 .seg input{position:absolute;opacity:0;pointer-events:none}
-.seg span{display:block;padding:8px 11px;border:1px solid var(--ink);border-radius:3px;cursor:pointer;font-family:var(--f-cond);font-size:15px;font-weight:500;font-variant-numeric:tabular-nums}
 .seg input:checked+span{background:var(--ink);color:var(--on-ink)}
 .toggles{display:flex;flex-direction:column;gap:8px}
 .toggles label{display:flex;gap:10px;align-items:flex-start;cursor:pointer;font-size:15px;line-height:1.35}
@@ -131,6 +126,29 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
 .foot{border-top:3px double var(--ink);padding-top:8px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-family:var(--f-serif);font-style:italic;font-size:15px;color:var(--muted)}
 
 .dock{position:sticky;top:env(safe-area-inset-top,0px);z-index:6;background:var(--paper);margin-left:calc(-1 * max(16px,env(safe-area-inset-left,0px)));margin-right:calc(-1 * max(16px,env(safe-area-inset-right,0px)));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;border-bottom:1px solid var(--ink);box-shadow:0 8px 16px -14px rgba(40,26,18,.5)}
+.setPanel{margin-top:10px;display:flex;flex-direction:column;gap:10px;max-height:calc(100dvh - 96px);overflow:auto;overscroll-behavior:contain}
+.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:36px;border-top:1px solid var(--hair)}
+@media (max-width:760px){.controls{grid-template-columns:minmax(0,1fr)}}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;padding-block:9px;border-bottom:1px solid var(--hair);min-width:0}
+.row .lbl{font-family:var(--f-serif);font-weight:600;font-size:16px;line-height:1.25}
+.seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden;max-width:100%}
+.seg span{display:block;padding:6px 10px;font-family:var(--f-cond);font-size:14px;font-weight:500;line-height:1.2;border-left:1px solid var(--hair);cursor:pointer;white-space:nowrap;font-variant-numeric:tabular-nums}
+.seg label:first-child span{border-left:none}
+.seg label:hover span{background:var(--paper-2)}
+.seg input:checked+span{background:var(--ink);color:var(--on-ink)}
+.sw{cursor:pointer}
+.sw input{appearance:none;-webkit-appearance:none;margin:0;flex:none;width:44px;height:26px;border-radius:13px;background:var(--hair);position:relative;cursor:pointer;transition:background .15s}
+.sw input::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--paper-2);box-shadow:0 1px 2px rgba(40,26,18,.3);transition:transform .15s}
+.sw input:checked{background:var(--red)}
+.sw input:checked::after{transform:translateX(18px)}
+.sw input:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.panelFoot{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;flex-wrap:wrap}
+.panelFoot .tools,.panelFoot .finish{display:flex;gap:4px 6px;flex-wrap:wrap;align-items:center}
+.panelFoot .finish{margin-left:auto}
+.panelFoot .note{font-size:14px;font-style:italic;color:var(--muted)}
+.ghost{border-color:transparent;padding:8px 8px;min-height:40px;font-weight:500;text-decoration:underline;text-decoration-color:var(--hair);text-underline-offset:4px}
+.ghost:hover{background:transparent;color:var(--red);text-decoration-color:currentColor}
+.ghost.danger{color:var(--red)}
 .dock::before{content:'';position:absolute;left:0;right:0;bottom:100%;height:240px;background:var(--paper)}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .brand{font-family:var(--f-flag);font-size:25px;line-height:1;margin-right:auto;padding-right:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 auto}
@@ -139,7 +157,6 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
 .emptyAdd small{font-family:var(--f-cond);font-size:15px;font-weight:500;color:var(--muted)}
 .toolbar .sum{font-family:var(--f-cond);font-size:14px;color:var(--muted);min-width:0;flex:1 1 180px}
 #setBtn[aria-expanded="true"]{background:var(--ink);color:var(--on-ink)}
-.setPanel{margin-top:10px;max-height:min(68vh,640px);overflow:auto;display:flex;flex-direction:column;gap:12px;padding-bottom:4px}
 .applyRow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .applyRow .note{font-size:15px;font-style:italic;color:var(--muted)}
 .trayGrid button{position:relative}
@@ -167,8 +184,8 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
   </div>
   <section class="setPanel" id="setPanel" hidden aria-label="Arrange stories">
   <div class="controls">
-    <div class="ctl"><span class="lbl">Photos per story</span>
-      <div class="seg" id="tiles">
+    <div class="row"><span class="lbl" id="l-tiles">Photos per story</span>
+      <div class="seg" role="radiogroup" aria-labelledby="l-tiles">
         <label><input type="radio" name="tiles" id="t-auto" value="auto"><span>Auto</span></label>
         <label><input type="radio" name="tiles" id="t-4" value="4"><span>4</span></label>
         <label><input type="radio" name="tiles" id="t-6" value="6" checked><span>6</span></label>
@@ -176,40 +193,43 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
         <label><input type="radio" name="tiles" id="t-12" value="12"><span>12</span></label>
         <label><input type="radio" name="tiles" id="t-15" value="15"><span>15</span></label>
         <label><input type="radio" name="tiles" id="t-20" value="20"><span>20</span></label>
-      </div>
-    </div>
-    <div class="ctl"><span class="lbl">Keep together</span>
-      <div class="seg" id="time">
-        <label><input type="radio" name="time" id="tm-day" value="day"><span>Same day</span></label>
-        <label><input type="radio" name="time" id="tm-trip" value="trip" checked><span>Same outing</span></label>
-        <label><input type="radio" name="time" id="tm-month" value="month"><span>Same month</span></label>
-        <label><input type="radio" name="time" id="tm-any" value="any"><span>Any time</span></label>
-      </div>
-    </div>
-    <div class="ctl"><span class="lbl">Vibe matching</span>
-      <div class="seg" id="vibe">
+      </div></div>
+    <div class="row"><span class="lbl" id="l-time">Keep together</span>
+      <div class="seg" role="radiogroup" aria-labelledby="l-time">
+        <label><input type="radio" name="time" id="tm-day" value="day"><span>Day</span></label>
+        <label><input type="radio" name="time" id="tm-trip" value="trip" checked><span>Outing</span></label>
+        <label><input type="radio" name="time" id="tm-month" value="month"><span>Month</span></label>
+        <label><input type="radio" name="time" id="tm-any" value="any"><span>Any</span></label>
+      </div></div>
+    <div class="row"><span class="lbl" id="l-vibe">Vibe match</span>
+      <div class="seg" role="radiogroup" aria-labelledby="l-vibe">
         <label><input type="radio" name="vibe" id="v-loose" value="loose"><span>Loose</span></label>
         <label><input type="radio" name="vibe" id="v-bal" value="balanced" checked><span>Balanced</span></label>
         <label><input type="radio" name="vibe" id="v-strict" value="strict"><span>Strict</span></label>
-      </div>
-    </div>
-    <div class="ctl"><span class="lbl">Match subject</span>
-      <div class="seg" id="cats">
+      </div></div>
+    <div class="row"><span class="lbl" id="l-cats">Subject match</span>
+      <div class="seg" role="radiogroup" aria-labelledby="l-cats">
         <label><input type="radio" name="cats" id="c-broad" value="broad" checked><span>Broad</span></label>
         <label><input type="radio" name="cats" id="c-exact" value="exact"><span>Exact</span></label>
         <label><input type="radio" name="cats" id="c-off" value="off"><span>Off</span></label>
-      </div>
-      <p class="recStatus" id="recStatus" hidden></p>
+      </div></div>
+    <label class="row sw"><span class="lbl">Pair contrasting vibes</span><input type="checkbox" id="mix" role="switch" checked></label>
+    <label class="row sw"><span class="lbl">Thin lines between photos</span><input type="checkbox" id="lines" role="switch"></label>
+  </div>
+  <p class="recStatus" id="recStatus" hidden></p>
+  <div class="panelFoot">
+    <div class="tools">
+      <button class="ghost" id="checkBtn">Check a posted collage</button>
+      <button class="ghost" id="regroupBtn">Reshuffle all</button>
+      <button class="ghost danger" id="clearBtn">Start over</button>
+      <input type="file" id="fileCollage" accept="image/*" multiple hidden>
     </div>
-    <div class="ctl"><span class="lbl">Style</span>
-      <div class="toggles">
-        <label><input type="checkbox" id="mix" checked><span>Pair contrasting vibes</span></label>
-        <label><input type="checkbox" id="lines"><span>Thin lines between photos</span></label>
-      </div>
+    <div class="finish">
+      <span class="note" id="applyNote" hidden>Saved stories won't change</span>
+      <button class="primary" id="applyBtn" hidden>Apply</button>
+      <button id="setClose">Done</button>
     </div>
   </div>
-  <div class="checkRow"><button id="checkBtn">Check a posted collage</button><p>Finds photos you've already posted so they don't get used twice.</p><input type="file" id="fileCollage" accept="image/*" multiple hidden></div>
-  <div class="applyRow"><button class="primary" id="applyBtn" hidden>Apply</button><span class="note" id="applyNote" hidden></span><button id="setClose">Done</button><button id="regroupBtn">Reshuffle all</button><button class="linkish" id="clearBtn">Start over</button></div>
   </section>
 </div>
 
