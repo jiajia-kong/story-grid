@@ -217,6 +217,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
     <label class="row sw"><span class="lbl">Thin lines between photos</span><input type="checkbox" id="lines" role="switch"></label>
   </div>
   <p class="recStatus" id="recStatus" hidden></p>
+  <p class="recStatus" id="storeInfo"></p>
   <div class="panelFoot">
     <div class="tools">
       <button class="ghost" id="checkBtn">Check a posted collage</button>
@@ -643,15 +644,39 @@ const DB={db:null,dirty:new Set(),gone:new Set(),t:null,warned:false};
 function openDB(){return new Promise((res,rej)=>{try{const r=indexedDB.open('story-curator',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('photos',{keyPath:'id'});d.createObjectStore('state',{keyPath:'id'})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
 const idbReq=(store,fn)=>new Promise((res,rej)=>{const r=fn(DB.db.transaction(store).objectStore(store));r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 function schedulePersist(){clearTimeout(DB.t);DB.t=setTimeout(persist,400)}
+const photoRec=p=>({id:p.id,name:p.name,t:p.t,key:p.key,feat:p.feat,fx:p.fx,fy:p.fy,autoFx:p.autoFx,autoFy:p.autoFy,zoom:p.zoom||1,blob:p.blob,cat:p.cat,catConf:p.catConf,catManual:p.catManual,catV:p.catV,sem:p.sem,emb:p.emb,usedPost:!!p.usedPost,excluded:!!p.excluded});
+/* Photos are written a few at a time: iPhones can reject one giant write even with space left. */
 function persist(){
   if(!DB.db||S.samples)return;
-  try{
-    const tx=DB.db.transaction(['photos','state'],'readwrite'),ps=tx.objectStore('photos');
-    DB.dirty.forEach(id=>{const p=S.photos.get(id);if(p&&p.blob)ps.put({id:p.id,name:p.name,t:p.t,key:p.key,feat:p.feat,fx:p.fx,fy:p.fy,autoFx:p.autoFx,autoFy:p.autoFy,zoom:p.zoom||1,blob:p.blob,cat:p.cat,catConf:p.catConf,catManual:p.catManual,catV:p.catV,sem:p.sem,emb:p.emb,usedPost:!!p.usedPost,excluded:!!p.excluded})});
-    DB.gone.forEach(id=>ps.delete(id));DB.dirty.clear();DB.gone.clear();
+  const ids=[...DB.dirty],gone=[...DB.gone];DB.dirty.clear();DB.gone.clear();
+  for(let i=0;i<ids.length;i+=3){
+    const chunk=ids.slice(i,i+3);
+    try{const tx=DB.db.transaction('photos','readwrite'),ps=tx.objectStore('photos');
+      chunk.forEach(id=>{const p=S.photos.get(id);if(p&&p.blob)ps.put(photoRec(p))});
+      tx.onabort=()=>{chunk.forEach(id=>DB.dirty.add(id));saveFailed(tx.error)};
+    }catch(e){chunk.forEach(id=>DB.dirty.add(id));saveFailed(e)}
+  }
+  try{const tx=DB.db.transaction(['photos','state'],'readwrite');
+    gone.forEach(id=>tx.objectStore('photos').delete(id));
     tx.objectStore('state').put({id:'main',stories:S.stories.map(s=>({...s,slots:s.slots.slice()})),tray:S.tray.slice(),nextId:S.nextId,used:S.used});
-    tx.onabort=()=>{if(!DB.warned){DB.warned=true;toast("This browser couldn't keep your photos, probably because it's out of space. They'll be gone when you close this page.")}};
-  }catch(e){}
+    tx.onabort=()=>{gone.forEach(id=>DB.gone.add(id));saveFailed(tx.error)};
+  }catch(e){saveFailed(e)}
+}
+function saveFailed(err){
+  const name=(err&&err.name)||'';
+  if(name==='QuotaExceededError'&&!DB.shrunk){DB.shrunk=true;shrinkStored();return}
+  if(DB.warned)return;DB.warned=true;
+  toast(name==='QuotaExceededError'?"Your phone is short on storage, so some photos won't be kept after you close the app. Free up space or add fewer photos at a time.":`Couldn't keep your photos on this device${name?` (${name})`:''}. They'll be gone when you close it.`);
+}
+/* Out of room: re-save every stored photo at a smaller size, then try again once. */
+async function shrinkStored(){
+  for(const p of S.photos.values()){
+    if(!p.blob||p.blob.size<300e3)continue;
+    try{const bmp=await createImageBitmap(p.blob),k=Math.min(1,1280/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');
+      c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);bmp.close();
+      const nb=await new Promise(r=>c.toBlob(r,'image/jpeg',0.85));if(nb){p.blob=nb;p.file=nb;DB.dirty.add(p.id)}}catch(e){}
+  }
+  schedulePersist();
 }
 async function init(){
   try{DB.db=await openDB()}catch(e){DB.db=null}
@@ -920,11 +945,11 @@ async function photoFrom(src,meta){
   const th=makeThumbs(src),a=analyze(th.thumb);
   return{id:'p'+(S.nextId++),...th,feat:a.feat,fx:a.fx,fy:a.fy,autoFx:a.fx,autoFy:a.fy,zoom:1,...meta};
 }
-/* A 2048px copy is what gets kept in the browser: plenty for a 1080×1920 story, far smaller than originals. */
+/* A 1600px copy is what gets kept in the browser: plenty for a 1080×1920 story, far smaller than originals. */
 function storeCopy(bmp){
-  const k=Math.min(1,2048/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');
+  const k=Math.min(1,1600/Math.max(bmp.width,bmp.height)),c=document.createElement('canvas');
   c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
-  return new Promise(r=>c.toBlob(r,'image/jpeg',0.9));
+  return new Promise(r=>c.toBlob(r,'image/jpeg',0.86));
 }
 const imageFiles=list=>[...list].filter(f=>/^image\//.test(f.type)||/\.(jpe?g|png|webp|heic|heif|gif|avif)$/i.test(f.name));
 async function importFiles(files){
@@ -980,7 +1005,12 @@ document.querySelectorAll('.controls input').forEach(i=>i.addEventListener('chan
   setPending(true);
 }));
 $('applyBtn').onclick=()=>{build(false);setPending(false);render();toast('Regrouped with the new settings. Saved stories stayed put.')};
-function openSettings(open){$('setPanel').hidden=!open;$('setBtn').setAttribute('aria-expanded',String(open))}
+function openSettings(open){$('setPanel').hidden=!open;$('setBtn').setAttribute('aria-expanded',String(open));if(open)showStorage()}
+async function showStorage(){const el=$('storeInfo');try{
+  if(!DB.db){el.textContent="This browser isn't keeping photos. Open Story Grid from your home screen.";return}
+  const e=await navigator.storage.estimate(),kept=navigator.storage.persisted?await navigator.storage.persisted():false;
+  el.textContent=`Photos stored on this device: ${Math.round((e.usage||0)/1e6)} MB${kept?' · protected from clean-up':''}`;
+}catch(err){el.textContent=''}}
 $('setBtn').onclick=()=>openSettings($('setPanel').hidden);
 $('setClose').onclick=()=>openSettings(false);
 
