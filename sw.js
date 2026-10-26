@@ -1,5 +1,5 @@
-const SHELL='story-grid-shell-v1-23731720', ML='story-grid-ml-v1', FONTS='story-grid-fonts-v1';
-const SHELL_FILES=['./','index.html','manifest.webmanifest','icons/icon-180.png','icons/icon-192.png','icons/icon-512.png','vendor/exifr.lite.umd.js','ml/ort.wasm.min.js'];
+const SHELL='story-grid-shell-v1-68360956', ML='story-grid-ml-v1', FONTS='story-grid-fonts-v1';
+const SHELL_FILES=['./','index.html','manifest.webmanifest','icons/icon-180.png','icons/icon-192.png','icons/icon-512.png','vendor/exifr.full.umd.js','ml/ort.wasm.min.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(SHELL).then(c=>c.addAll(SHELL_FILES)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('story-grid-shell-')&&k!==SHELL).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{

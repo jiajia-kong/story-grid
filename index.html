@@ -17,7 +17,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Display&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,750;1,6..72,400;1,6..72,500&family=Libre+Franklin:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=Permanent+Marker&display=swap" rel="stylesheet">
-<script src="vendor/exifr.lite.umd.js"></script>
+<script src="vendor/exifr.full.umd.js"></script>
 <script src="ml/ort.wasm.min.js"></script>
 <style>
 /* Layout: a printer's proof sheet. Black film band, blackletter flag, folio rule, a two-column lead,
@@ -142,6 +142,17 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
 .sw input:checked{background:var(--red)}
 .sw input:checked::after{transform:translateX(18px)}
 .sw input:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.sheetLbl{margin:0;font-family:var(--f-serif);font-weight:600;font-size:16px}
+.sheetLbl span{font-family:var(--f-cond);font-weight:400;font-size:14px;color:var(--muted);margin-left:6px}
+.trayGrid button.inStory::after{content:"In a story";position:absolute;left:4px;bottom:4px;font-family:var(--f-cond);font-size:11px;font-weight:600;background:var(--paper-2);color:var(--ink);padding:1px 5px;border-radius:2px}
+.row.trips{grid-column:1/-1;align-items:flex-start;flex-direction:column}
+.tripList{display:flex;gap:6px;flex-wrap:wrap}
+.tripChip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--ink);border-radius:4px;padding:3px 4px 3px 10px;font-family:var(--f-cond);font-size:14px}
+.tripChip button{border:none;min-height:30px;padding:2px 8px;font-size:16px;line-height:1}
+.tripForm{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.tripForm label{font-family:var(--f-cond);font-size:13px;color:var(--muted)}
+.tripForm input{font-family:var(--f-cond);font-size:15px;padding:7px 8px;border:1.5px solid var(--ink);border-radius:4px;background:var(--paper-2);color:var(--ink);min-height:38px}
+.tripForm input[type=text]{width:9em}
 .panelFoot{display:flex;justify-content:space-between;align-items:center;gap:8px 12px;flex-wrap:wrap}
 .panelFoot .tools,.panelFoot .finish{display:flex;gap:4px 6px;flex-wrap:wrap;align-items:center}
 .panelFoot .finish{margin-left:auto}
@@ -213,6 +224,16 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
         <label><input type="radio" name="cats" id="c-exact" value="exact"><span>Exact</span></label>
         <label><input type="radio" name="cats" id="c-off" value="off"><span>Off</span></label>
       </div></div>
+    <div class="row trips"><span class="lbl">Trips</span>
+      <div class="tripList" id="tripList"></div>
+      <button class="ghost" id="tripAdd" aria-expanded="false">+ Add a trip</button>
+      <form class="tripForm" id="tripForm" hidden>
+        <label for="tripName">Name</label><input id="tripName" type="text" placeholder="Bangkok" maxlength="30" required>
+        <label for="tripStart">From</label><input id="tripStart" type="date" required>
+        <label for="tripEnd">To</label><input id="tripEnd" type="date" required>
+        <button class="primary" type="submit" id="tripSave">Add</button>
+      </form>
+    </div>
     <label class="row sw"><span class="lbl">Pair contrasting vibes</span><input type="checkbox" id="mix" role="switch" checked></label>
     <label class="row sw"><span class="lbl">Thin lines between photos</span><input type="checkbox" id="lines" role="switch"></label>
   </div>
@@ -301,7 +322,10 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
     <div class="actions"><button class="primary" id="pickFiles">From Files</button><button id="sheetClose">Cancel</button></div>
   </div>
   <p class="hint" id="sheetHint">Pick a left-out photo, or add a new one.</p>
+  <p class="sheetLbl" id="sheetLbl1">For later</p>
   <div class="trayGrid" id="sheetGrid"></div>
+  <p class="sheetLbl" id="sheetLbl2" hidden>In your other stories <span>picking one swaps the two</span></p>
+  <div class="trayGrid" id="sheetGrid2"></div>
 </div>
 <input type="file" id="file2" accept="image/*" multiple hidden>
 <div class="modal" id="editor" hidden role="dialog" aria-label="Adjust crop">
@@ -317,7 +341,7 @@ const SIZES=[4,6,9,12,15,20];
 const LAYOUT={4:[2,2],6:[2,3],9:[3,3],12:[3,4],15:[3,5],20:[4,5]};
 const W=1080,H=1920;
 const VIBE_T={strict:0.17,balanced:0.27,loose:0.4};
-const S={photos:new Map(),stories:[],tray:[],sel:null,nextId:1,samples:false,used:[],multi:null};
+const S={photos:new Map(),stories:[],tray:[],sel:null,nextId:1,samples:false,used:[],multi:null,trips:[],manualCats:[]};
 const cos=(a,b)=>{let s=0;for(let i=0;i<512;i++)s+=a[i]*b[i];return s};
 const $=id=>document.getElementById(id);
 const CAT_NAMES=["scenery", "streets", "buildings", "culture", "art", "food", "drinks", "night", "wellness", "style", "people", "animals", "transit"];const CAT_V=3;
@@ -435,13 +459,30 @@ function moodName(f){
 }
 
 /* ---------- grouping ---------- */
+const dayStart=d=>{const[y,m,dd]=d.split('-').map(Number);return new Date(y,m-1,dd).getTime()};
+/* A trip runs from 5 a.m. on its first day to 5 a.m. after its last day, so late nights count. */
+function tripOf(p){for(const tr of S.trips){if(p.t>=dayStart(tr.start)+5*3600e3&&p.t<dayStart(tr.end)+29*3600e3)return tr}return null}
 function partition(ps,mode){
+  if(S.trips.length){
+    const inTrip=new Map(),rest=[];
+    ps.forEach(p=>{const tr=tripOf(p);if(tr){if(!inTrip.has(tr.id))inTrip.set(tr.id,[]);inTrip.get(tr.id).push(p)}else rest.push(p)});
+    const out=[];inTrip.forEach(g=>{if(mode==='day')out.push(...partitionBy(g,'day'));else out.push(g.sort((a,b)=>a.t-b.t))});
+    return out.concat(partitionBy(rest,mode));
+  }
+  return partitionBy(ps,mode);
+}
+function partitionBy(ps,mode){
   const s=[...ps].sort((a,b)=>a.t-b.t);
   if(mode==='any')return s.length?[s]:[];
-  if(mode==='trip'){const out=[];let cur=[];s.forEach(p=>{if(cur.length&&p.t-cur[cur.length-1].t>36*3600e3){out.push(cur);cur=[]}cur.push(p)});if(cur.length)out.push(cur);return out}
+  if(mode==='trip'){const out=[];let cur=[];s.forEach(p=>{const q=cur[cur.length-1];if(q&&!sameOuting(p,q)){out.push(cur);cur=[]}cur.push(p)});if(cur.length)out.push(cur);return out}
   const key=p=>{const d=new Date(p.t-(mode==='day'?5*3600e3:0));return mode==='day'?`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`:`${d.getFullYear()}-${d.getMonth()}`};
   const m=new Map();s.forEach(p=>{const k=key(p);if(!m.has(k))m.set(k,[]);m.get(k).push(p)});return [...m.values()];
 }
+const OUTING_GAP=3*3600e3,OUTING_KM=2;
+function kmBetween(a,b){const R=6371,r=Math.PI/180,dLa=(b.lat-a.lat)*r,dLo=(b.lon-a.lon)*r;const h=Math.sin(dLa/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+const hasGeo=p=>typeof p.lat==='number'&&typeof p.lon==='number';
+/* Same outing: taken within 3 hours of each other, and (when both photos know where they were taken) within 2 km. */
+function sameOuting(p,q){if(Math.abs(p.t-q.t)>OUTING_GAP)return false;if(hasGeo(p)&&hasGeo(q)&&kmBetween(p,q)>OUTING_KM)return false;return true}
 function cluster(items,T){
   const cl=items.map(p=>({items:[p],c:pvec(p)}));
   while(cl.length>1){
@@ -558,9 +599,14 @@ async function renderFull(st){
 /* ---------- labels ---------- */
 const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function dateLabel(st){
+  const tps=st.slots.map(id=>S.photos.get(id)).filter(Boolean).map(tripOf),tn=tps.length&&tps.every(x=>x&&x.id===tps[0].id)?tps[0].name+' \u00b7 ':'';
+  return tn+dateSpan(st);
+}
+function dateSpan(st){
   const ts=st.slots.map(id=>S.photos.get(id)).filter(Boolean).map(p=>p.t).sort((a,b)=>a-b);
   if(!ts.length)return'';const a=new Date(ts[0]),b=new Date(ts[ts.length-1]);
-  if(a.toDateString()===b.toDateString())return`${MON[a.getMonth()]} ${a.getDate()}`;
+  const hr=d=>{const h=d.getHours();return `${h%12||12}${h<12?'am':'pm'}`};
+  if(a.toDateString()===b.toDateString())return`${MON[a.getMonth()]} ${a.getDate()} \u00b7 ${hr(a)===hr(b)?hr(a):hr(a)+'\u2013'+hr(b)}`;
   if(a.getMonth()===b.getMonth()&&a.getFullYear()===b.getFullYear()&&b.getDate()-a.getDate()<=7)return`${MON[a.getMonth()]} ${a.getDate()}–${b.getDate()}`;
   if(a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth())return`${MON[a.getMonth()]} ${a.getFullYear()}`;
   return`${MON[a.getMonth()]} ${a.getFullYear()===b.getFullYear()?'':a.getFullYear()+' '}– ${MON[b.getMonth()]} ${b.getFullYear()}`;
@@ -598,7 +644,8 @@ function render(){
     const act=document.createElement('div');act.className='actions';
     const empty=st.slots.some(id=>!id);
     const del=btn('Delete',()=>twoTap(del,'Tap again to delete',()=>{S.stories=S.stories.filter(x=>x!==st);deletePhotos(st.slots.filter(Boolean));S.sel=null;render()}));
-    act.append(btn('Save',()=>saveStory(st),empty,!st.saved),btn('Shuffle',()=>{shuffle(st.slots);st.saved=false;S.sel=null;render()}),btn('Break apart',()=>{st.slots.filter(Boolean).forEach(id=>S.tray.push(id));S.stories=S.stories.filter(x=>x!==st);S.sel=null;render()}),del);
+    if(st.saved)act.append(btn('Save again',()=>saveStory(st)),btn('Edit',()=>{st.saved=false;S.sel=null;render();toast('Moved back to Stories to edit.')}),del);
+    else act.append(btn('Save',()=>saveStory(st),empty,true),btn('Shuffle',()=>{shuffle(st.slots);st.saved=false;S.sel=null;render()}),btn('Break apart',()=>{st.slots.filter(Boolean).forEach(id=>S.tray.push(id));S.stories=S.stories.filter(x=>x!==st);S.sel=null;render()}),del);
     card.append(fr,meta,act);
     (st.saved?sbox:box).appendChild(card);
   });
@@ -644,7 +691,7 @@ const DB={db:null,dirty:new Set(),gone:new Set(),t:null,warned:false};
 function openDB(){return new Promise((res,rej)=>{try{const r=indexedDB.open('story-curator',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('photos',{keyPath:'id'});d.createObjectStore('state',{keyPath:'id'})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
 const idbReq=(store,fn)=>new Promise((res,rej)=>{const r=fn(DB.db.transaction(store).objectStore(store));r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 function schedulePersist(){clearTimeout(DB.t);DB.t=setTimeout(persist,400)}
-const photoRec=p=>({id:p.id,name:p.name,t:p.t,key:p.key,feat:p.feat,fx:p.fx,fy:p.fy,autoFx:p.autoFx,autoFy:p.autoFy,zoom:p.zoom||1,blob:p.blob,cat:p.cat,catConf:p.catConf,catManual:p.catManual,catV:p.catV,sem:p.sem,emb:p.emb,usedPost:!!p.usedPost,excluded:!!p.excluded});
+const photoRec=p=>({id:p.id,name:p.name,t:p.t,key:p.key,feat:p.feat,fx:p.fx,fy:p.fy,autoFx:p.autoFx,autoFy:p.autoFy,zoom:p.zoom||1,blob:p.blob,cat:p.cat,catConf:p.catConf,catManual:p.catManual,catV:p.catV,sem:p.sem,emb:p.emb,usedPost:!!p.usedPost,lat:p.lat,lon:p.lon,excluded:!!p.excluded});
 /* Photos are written a few at a time: iPhones can reject one giant write even with space left. */
 function persist(){
   if(!DB.db||S.samples)return;
@@ -658,7 +705,7 @@ function persist(){
   }
   try{const tx=DB.db.transaction(['photos','state'],'readwrite');
     gone.forEach(id=>tx.objectStore('photos').delete(id));
-    tx.objectStore('state').put({id:'main',stories:S.stories.map(s=>({...s,slots:s.slots.slice()})),tray:S.tray.slice(),nextId:S.nextId,used:S.used});
+    tx.objectStore('state').put({id:'main',stories:S.stories.map(s=>({...s,slots:s.slots.slice()})),tray:S.tray.slice(),nextId:S.nextId,used:S.used,trips:S.trips,manualCats:S.manualCats});
     tx.onabort=()=>{gone.forEach(id=>DB.gone.add(id));saveFailed(tx.error)};
   }catch(e){saveFailed(e)}
 }
@@ -686,7 +733,7 @@ async function init(){
       $('storiesTitle').textContent='Restoring your photos…';
       for(const r of recs){try{const bmp=await createImageBitmap(r.blob);const th=makeThumbs(bmp);bmp.close();S.photos.set(r.id,{...r,file:r.blob,...th})}catch(e){}}
       $('storiesTitle').textContent='Stories';
-      if(state){S.used=state.used||[];S.nextId=Math.max(state.nextId||1,S.nextId);S.stories=(state.stories||[]).map(s=>({...s,slots:s.slots.map(id=>S.photos.has(id)?id:null)}));S.tray=(state.tray||[]).filter(id=>S.photos.has(id)&&!S.photos.get(id).excluded)}
+      if(state){S.used=state.used||[];S.trips=state.trips||[];S.manualCats=state.manualCats||[];S.nextId=Math.max(state.nextId||1,S.nextId);S.stories=(state.stories||[]).map(s=>({...s,slots:s.slots.map(id=>S.photos.has(id)?id:null)}));S.tray=(state.tray||[]).filter(id=>S.photos.has(id)&&!S.photos.get(id).excluded)}
       const placed=new Set(S.tray);S.stories.forEach(s=>s.slots.forEach(id=>{if(id)placed.add(id)}));
       S.photos.forEach((p,id)=>{if(!placed.has(id)&&!p.excluded)S.tray.push(id)});
       render();
@@ -704,6 +751,7 @@ function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random
 const getRef=r=>r.type==='tray'||r.type==='hidden'?r.pid:S.stories.find(s=>s.id===r.sid).slots[r.idx];
 function same(a,b){return a.type===b.type&&(a.type==='tray'?a.pid===b.pid:a.sid===b.sid&&a.idx===b.idx)}
 function tapSlot(ref){
+  if(ref.type==='story'){const s=S.stories.find(x=>x.id===ref.sid);if(s&&s.saved){toast('This story is saved. Tap Edit to change it.');return}}
   if(ref.type==='hidden'){S.sel=S.sel&&same(S.sel,ref)?null:ref;render();return}
   if(S.sel&&S.sel.type==='hidden')S.sel=null;
   if(!S.sel){if(getRef(ref)){S.sel=ref;render()}else if(ref.type==='story')openPicker(ref);return}
@@ -718,11 +766,13 @@ $('cancelSel').onclick=()=>{S.sel=null;render()};
 $('toTray').onclick=()=>{const r=S.sel;if(!r||r.type!=='story')return;const st=S.stories.find(s=>s.id===r.sid);S.tray.push(st.slots[r.idx]);st.slots[r.idx]=null;st.saved=false;S.sel=null;render()};
 $('delPhoto').onclick=()=>twoTap($('delPhoto'),'Tap again to delete',()=>{const r=S.sel;if(r&&(r.type==='tray'||r.type==='hidden')){deletePhotos([r.pid]);S.sel=null;render()}});
 $('clearSaved').onclick=()=>twoTap($('clearSaved'),'Tap again to clear',()=>{const gone=S.stories.filter(s=>s.saved);S.stories=S.stories.filter(s=>!s.saved);deletePhotos(gone.flatMap(s=>s.slots.filter(Boolean)));S.sel=null;render();toast(`Cleared ${gone.length} saved stor${gone.length>1?'ies':'y'}.`)});
-$('catSel').onchange=e=>{const p=S.sel&&S.photos.get(getRef(S.sel));if(!p)return;p.catManual=e.target.value;DB.dirty.add(p.id);render();toast(`Set to ${CAT_LABEL[p.catManual]}. Tap Remix to regroup with it.`)};
+$('catSel').onchange=e=>{const p=S.sel&&S.photos.get(getRef(S.sel));if(!p)return;p.catManual=e.target.value;DB.dirty.add(p.id);if(p.emb){S.manualCats=S.manualCats.filter(m=>cos(m.e,p.emb)<0.95);S.manualCats.push({e:p.emb,cat:p.catManual})}render();toast(`Set to ${CAT_LABEL[p.catManual]}. Tap Remix to regroup with it.`)};
 function mostCommon(arr){const m=new Map();arr.forEach(x=>m.set(x,(m.get(x)||0)+1));let b=null,n=-1;m.forEach((v,k)=>{if(v>n){n=v;b=k}});return b}
+const sameDayKey=t=>{const d=new Date(t-5*3600e3);return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`};
 function timeOk(p,ps,mode){
+  if(S.trips.length){const tp=tripOf(p),tq=ps.map(tripOf);if(tp||tq.some(Boolean))return tq.some(x=>x&&tp&&x.id===tp.id)&&(mode!=='day'||ps.some(q=>sameDayKey(q.t)===sameDayKey(p.t)))}
   if(mode==='any')return true;
-  if(mode==='trip')return ps.some(q=>Math.abs(q.t-p.t)<=36*3600e3);
+  if(mode==='trip')return ps.some(q=>sameOuting(p,q));
   const key=t=>{const d=new Date(t-(mode==='day'?5*3600e3:0));return mode==='day'?`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`:`${d.getFullYear()}-${d.getMonth()}`};
   const ks=new Set(ps.map(q=>key(q.t)));return ks.has(key(p.t));
 }
@@ -774,6 +824,11 @@ function looksPosted(p){
   return false;
 }
 /* New photos that match something already posted go straight to Hidden, marked Used. */
+function reapplyCats(ids){
+  if(!S.manualCats.length)return;
+  ids.forEach(id=>{const p=S.photos.get(id);if(!p||!p.emb||p.catManual)return;let best=null,bc=0.95;
+    for(const m of S.manualCats){const c=cos(m.e,p.emb);if(c>bc){bc=c;best=m}}if(best){p.catManual=best.cat;DB.dirty.add(id)}});
+}
 function catchPosted(ids){
   let n=0;
   ids.forEach(id=>{const p=S.photos.get(id);if(!p||p.excluded||!looksPosted(p))return;
@@ -844,11 +899,17 @@ function openPicker(ref){
   PICK=ref;S.sel=null;render();
   const st=S.stories.find(s=>s.id===ref.sid),filled=!!st.slots[ref.idx];
   $('sheetTitle').textContent=filled?'Replace this photo':'Fill this spot';
-  $('sheetHint').textContent=S.tray.length?'':'Nothing left out.';$('sheetHint').hidden=!!S.tray.length;
+  $('sheetHint').textContent=S.tray.length?'':'Nothing in For later.';$('sheetHint').hidden=!!S.tray.length;$('sheetLbl1').hidden=!S.tray.length;
   const g=$('sheetGrid');g.innerHTML='';
-  S.tray.forEach(id=>{const p=S.photos.get(id);const b=document.createElement('button');b.setAttribute('aria-label','Use '+p.name);
-    const im=document.createElement('img');im.src=p.thumbURL;im.alt='';b.appendChild(im);
-    b.onclick=()=>{placeInto(PICK,id);closePicker()};g.appendChild(b)});
+  const thumb=(p,label,cls)=>{const b=document.createElement('button');b.setAttribute('aria-label',label);if(cls)b.classList.add(cls);
+    const im=document.createElement('img');im.src=p.thumbURL;im.alt='';b.appendChild(im);return b};
+  S.tray.forEach(id=>{const p=S.photos.get(id);const b=thumb(p,'Use '+p.name);b.onclick=()=>{placeInto(PICK,id);closePicker()};g.appendChild(b)});
+  /* Photos already in another unsaved story: picking one swaps the two spots. */
+  const g2=$('sheetGrid2');g2.innerHTML='';let n2=0;
+  S.stories.forEach(os=>{if(os.saved)return;os.slots.forEach((id,j)=>{if(!id||(os.id===st.id&&j===ref.idx))return;const p=S.photos.get(id);if(!p)return;n2++;
+    const b=thumb(p,'Swap with '+p.name,'inStory');
+    b.onclick=()=>{const cur=st.slots[ref.idx];st.slots[ref.idx]=id;os.slots[j]=cur||null;st.saved=false;os.saved=false;closePicker();toast(cur?'Swapped.':'Moved here. Its old spot is now empty.')};g2.appendChild(b)})});
+  $('sheetLbl2').hidden=!n2;
   $('sheet').hidden=false;
 }
 function closePicker(){PICK=null;$('sheet').hidden=true;render()}
@@ -860,7 +921,7 @@ $('file2').onchange=async e=>{
   $('sheet').hidden=true;
   let{ids,skipped,dupes}=await importFiles(files);
   await runRecognition(ids);
-  catchPosted(ids);ids=ids.filter(id=>!S.photos.get(id).excluded);
+  reapplyCats(ids);catchPosted(ids);ids=ids.filter(id=>!S.photos.get(id).excluded);
   if(ids.length){placeInto(ref,ids[0]);ids.slice(1).forEach(id=>S.tray.push(id))}
   PICK=null;render();
   if(skipped)toast(`Couldn't open ${skipped} photo${skipped>1?'s':''}. Try converting HEIC to JPEG.`);
@@ -960,10 +1021,11 @@ async function importFiles(files){
     $('storiesTitle').textContent=`Reading ${++done} of ${files.length}…`;
     try{
       const bmp=await createImageBitmap(f);
-      let t=f.lastModified||Date.now();
-      if(window.exifr){try{const o=await exifr.parse(f,{pick:['DateTimeOriginal','CreateDate']});const dt=o&&(o.DateTimeOriginal||o.CreateDate);if(dt instanceof Date&&!isNaN(dt))t=dt.getTime()}catch(e){}}
+      let t=f.lastModified||Date.now(),geo={};
+      if(window.exifr){try{const o=await exifr.parse(f,{pick:['DateTimeOriginal','CreateDate']});const dt=o&&(o.DateTimeOriginal||o.CreateDate);if(dt instanceof Date&&!isNaN(dt))t=dt.getTime()}catch(e){}
+        try{const g=await exifr.gps(f);if(g&&isFinite(g.latitude)&&isFinite(g.longitude)){geo={lat:g.latitude,lon:g.longitude}}}catch(e){}}
       const blob=await storeCopy(bmp);
-      const p=await photoFrom(bmp,{file:blob||f,blob,name:f.name,t,key});bmp.close();S.photos.set(p.id,p);ids.push(p.id);if(blob)DB.dirty.add(p.id);
+      const p=await photoFrom(bmp,{file:blob||f,blob,name:f.name,t,key,...geo});bmp.close();S.photos.set(p.id,p);ids.push(p.id);if(blob)DB.dirty.add(p.id);
     }catch(e){skipped++}
   }
   $('storiesTitle').textContent='Stories';
@@ -976,6 +1038,7 @@ async function addFiles(list){
   const{ids,skipped,dupes}=await importFiles(files);
   try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
   await runRecognition(ids);
+  reapplyCats(ids);
   const caught=catchPosted(ids);
   const made=build(true);render();
   const twinsNew=ids.filter(id=>{const p=S.photos.get(id);return p&&p.twin}).length;
@@ -1005,7 +1068,17 @@ document.querySelectorAll('.controls input').forEach(i=>i.addEventListener('chan
   setPending(true);
 }));
 $('applyBtn').onclick=()=>{build(false);setPending(false);render();toast('Regrouped with the new settings. Saved stories stayed put.')};
-function openSettings(open){$('setPanel').hidden=!open;$('setBtn').setAttribute('aria-expanded',String(open));if(open)showStorage()}
+function fmtDay(d){const[y,m,dd]=d.split('-').map(Number);return `${MON[m-1]} ${dd}`}
+function renderTrips(){const box=$('tripList');box.innerHTML='';
+  S.trips.forEach(tr=>{const c=document.createElement('span');c.className='tripChip';c.textContent=`${tr.name} \u00b7 ${fmtDay(tr.start)}\u2013${fmtDay(tr.end)}`;
+    const x=document.createElement('button');x.type='button';x.textContent='\u00d7';x.setAttribute('aria-label','Remove trip '+tr.name);
+    x.onclick=()=>{S.trips=S.trips.filter(q=>q!==tr);renderTrips();tripsChanged()};c.appendChild(x);box.appendChild(c)})}
+function tripsChanged(){schedulePersist();if(S.samples||!S.photos.size){build(false);render()}else setPending(true)}
+$('tripAdd').onclick=()=>{const f=$('tripForm'),open=f.hidden;f.hidden=!open;$('tripAdd').setAttribute('aria-expanded',String(open));if(open)$('tripName').focus()};
+$('tripForm').addEventListener('submit',e=>{e.preventDefault();const name=$('tripName').value.trim(),s=$('tripStart').value,en=$('tripEnd').value;
+  if(!name||!s||!en)return;const[a,b]=s<=en?[s,en]:[en,s];S.trips.push({id:'tr'+(S.nextId++),name,start:a,end:b});
+  $('tripForm').reset();$('tripForm').hidden=true;$('tripAdd').setAttribute('aria-expanded','false');renderTrips();tripsChanged();toast(`Added ${name}. Tap Apply to regroup.`)});
+function openSettings(open){if(open)renderTrips();$('setPanel').hidden=!open;$('setBtn').setAttribute('aria-expanded',String(open));if(open)showStorage()}
 async function showStorage(){const el=$('storeInfo');try{
   if(!DB.db){el.textContent="This browser isn't keeping photos. Open Story Grid from your home screen.";return}
   const e=await navigator.storage.estimate(),kept=navigator.storage.persisted?await navigator.storage.persisted():false;
