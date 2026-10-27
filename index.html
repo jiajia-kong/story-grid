@@ -145,6 +145,8 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
 .sheetLbl{margin:0;font-family:var(--f-serif);font-weight:600;font-size:16px}
 .sheetLbl span{font-family:var(--f-cond);font-weight:400;font-size:14px;color:var(--muted);margin-left:6px}
 .trayGrid button.inStory::after{content:"In a story";position:absolute;left:4px;bottom:4px;font-family:var(--f-cond);font-size:11px;font-weight:600;background:var(--paper-2);color:var(--ink);padding:1px 5px;border-radius:2px}
+.banner.stale{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;font-style:normal;border-style:solid;border-color:var(--red)}
+.banner.stale span{flex:1 1 260px}
 .row.trips{grid-column:1/-1;align-items:flex-start;flex-direction:column}
 .tripList{display:flex;gap:6px;flex-wrap:wrap}
 .tripChip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--ink);border-radius:4px;padding:3px 4px 3px 10px;font-family:var(--f-cond);font-size:14px}
@@ -234,7 +236,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
         <button class="primary" type="submit" id="tripSave">Add</button>
       </form>
     </div>
-    <label class="row sw"><span class="lbl">Pair contrasting vibes</span><input type="checkbox" id="mix" role="switch" checked></label>
+    <label class="row sw"><span class="lbl">Pair contrasting vibes</span><input type="checkbox" id="mix" role="switch"></label>
     <label class="row sw"><span class="lbl">Thin lines between photos</span><input type="checkbox" id="lines" role="switch"></label>
   </div>
   <p class="recStatus" id="recStatus" hidden></p>
@@ -243,7 +245,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
     <div class="tools">
       <button class="ghost" id="checkBtn">Check a posted collage</button>
       <button class="ghost" id="regroupBtn">Reshuffle all</button>
-      <button class="ghost danger" id="clearBtn">Start over</button>
+      <button class="ghost danger" id="clearBtn">Clear all photos</button>
       <input type="file" id="fileCollage" accept="image/*" multiple hidden>
     </div>
     <div class="finish">
@@ -260,6 +262,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
 
   
   <div id="sampleNote" class="banner" hidden>Sample photos. Add yours to replace them.</div>
+  <div id="staleNote" class="banner stale" hidden><span><b>Some photos were added before Story Grid could read their dates,</b> so they may be grouped with the wrong day or trip. Clear them and add them again.</span><button class="primary" id="staleClear">Clear all photos</button></div>
 
   <section style="display:flex;flex-direction:column;gap:14px">
     <div class="secHead">
@@ -466,7 +469,9 @@ function partition(ps,mode){
   if(S.trips.length){
     const inTrip=new Map(),rest=[];
     ps.forEach(p=>{const tr=tripOf(p);if(tr){if(!inTrip.has(tr.id))inTrip.set(tr.id,[]);inTrip.get(tr.id).push(p)}else rest.push(p)});
-    const out=[];inTrip.forEach(g=>{if(mode==='day')out.push(...partitionBy(g,'day'));else out.push(g.sort((a,b)=>a.t-b.t))});
+    const out=[];S.tripSplit={};
+    inTrip.forEach((g,tid)=>{const parts=splitByPlace(g);if(parts.length>1)S.tripSplit[tid]=true;
+      parts.forEach(pg=>{if(mode==='day')out.push(...partitionBy(pg,'day'));else out.push(pg.sort((a,b)=>a.t-b.t))})});
     return out.concat(partitionBy(rest,mode));
   }
   return partitionBy(ps,mode);
@@ -478,10 +483,20 @@ function partitionBy(ps,mode){
   const key=p=>{const d=new Date(p.t-(mode==='day'?5*3600e3:0));return mode==='day'?`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`:`${d.getFullYear()}-${d.getMonth()}`};
   const m=new Map();s.forEach(p=>{const k=key(p);if(!m.has(k))m.set(k,[]);m.get(k).push(p)});return [...m.values()];
 }
-const OUTING_GAP=3*3600e3,OUTING_KM=2;
+const PLACE_KM=150,OUTING_GAP=24*3600e3,OUTING_KM=PLACE_KM;
+/* Photos far apart (another city or country) never share a collage, even inside one trip. */
+function splitByPlace(g){
+  const geo=g.filter(p=>hasGeo(p));if(geo.length<2)return[g];
+  const groups=[];geo.forEach(p=>{const hit=groups.filter(gr=>gr.some(q=>kmBetween(p,q)<=PLACE_KM));
+    if(!hit.length)groups.push([p]);else{const m=hit[0];hit.slice(1).forEach(h=>{m.push(...h);groups.splice(groups.indexOf(h),1)});m.push(p)}});
+  if(groups.length<2)return[g];
+  g.filter(p=>!hasGeo(p)).forEach(p=>{let best=groups[0],bd=Infinity;groups.forEach(gr=>gr.forEach(q=>{const d=Math.abs(q.t-p.t);if(d<bd){bd=d;best=gr}}));best.push(p)});
+  return groups;
+}
+const farApart=(p,ps)=>hasGeo(p)&&ps.some(hasGeo)&&!ps.some(q=>hasGeo(q)&&kmBetween(p,q)<=PLACE_KM);
 function kmBetween(a,b){const R=6371,r=Math.PI/180,dLa=(b.lat-a.lat)*r,dLo=(b.lon-a.lon)*r;const h=Math.sin(dLa/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dLo/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
 const hasGeo=p=>typeof p.lat==='number'&&typeof p.lon==='number';
-/* Same outing: taken within 3 hours of each other, and (when both photos know where they were taken) within 2 km. */
+/* Same outing: taken within a day of each other, and (when both photos know where they were taken) in the same city. */
 function sameOuting(p,q){if(Math.abs(p.t-q.t)>OUTING_GAP)return false;if(hasGeo(p)&&hasGeo(q)&&kmBetween(p,q)>OUTING_KM)return false;return true}
 function cluster(items,T){
   const cl=items.map(p=>({items:[p],c:pvec(p)}));
@@ -599,7 +614,7 @@ async function renderFull(st){
 /* ---------- labels ---------- */
 const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function dateLabel(st){
-  const tps=st.slots.map(id=>S.photos.get(id)).filter(Boolean).map(tripOf),tn=tps.length&&tps.every(x=>x&&x.id===tps[0].id)?tps[0].name+' \u00b7 ':'';
+  const tps=st.slots.map(id=>S.photos.get(id)).filter(Boolean).map(tripOf),tn=tps.length&&tps.every(x=>x&&x.id===tps[0].id)&&!(S.tripSplit&&S.tripSplit[tps[0].id])?tps[0].name+' \u00b7 ':'';
   return tn+dateSpan(st);
 }
 function dateSpan(st){
@@ -621,6 +636,7 @@ function storyName(st){
 /* ---------- render ---------- */
 function render(){
   const box=$('stories');box.innerHTML='';const sbox=$('savedStories');sbox.innerHTML='';
+  const stale=[...S.photos.values()].filter(p=>!p.sample&&!p.dateSrc).length;$('staleNote').hidden=!stale;
   const nSaved=S.stories.filter(s=>s.saved).length;$('savedSec').hidden=!nSaved;$('savedCount').textContent=nSaved?`${nSaved} stor${nSaved>1?'ies':'y'}`:'';
   const total=S.photos.size,used=S.stories.reduce((s,st)=>s+st.slots.filter(Boolean).length,0);
   $('count').textContent=total?`${S.stories.length} ${S.stories.length===1?'story':'stories'} · ${used}/${total} photos`:'';
@@ -658,7 +674,8 @@ function render(){
   tr.classList.toggle('multi',!!(S.multi&&S.multi.kind==='tray'));
   const storySel=!!(S.sel&&S.sel.type==='story');
   $('bar').hidden=!S.sel;$('toTray').hidden=!storySel;$('cropBtn').hidden=!storySel;$('replaceBtn').hidden=!storySel;
-  $('barText').textContent=storySel?'Tap another to swap':'Tap a spot to place it';
+  const sp0=S.sel&&S.photos.get(getRef(S.sel));const info=sp0?` \u00b7 ${new Date(sp0.t).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}${sp0.dateSrc==='file'?' (no photo date)':''}${hasGeo(sp0)?'':' \u00b7 no location'}`:'';
+  $('barText').textContent=(storySel?'Tap another to swap':'Tap a spot to place it')+info;
   const hidSel=!!(S.sel&&S.sel.type==='hidden');
   if(hidSel)$('barText').textContent='Hidden';
   $('delPhoto').hidden=!(S.sel&&(S.sel.type==='tray'||hidSel));
@@ -691,7 +708,7 @@ const DB={db:null,dirty:new Set(),gone:new Set(),t:null,warned:false};
 function openDB(){return new Promise((res,rej)=>{try{const r=indexedDB.open('story-curator',1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('photos',{keyPath:'id'});d.createObjectStore('state',{keyPath:'id'})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}})}
 const idbReq=(store,fn)=>new Promise((res,rej)=>{const r=fn(DB.db.transaction(store).objectStore(store));r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 function schedulePersist(){clearTimeout(DB.t);DB.t=setTimeout(persist,400)}
-const photoRec=p=>({id:p.id,name:p.name,t:p.t,key:p.key,feat:p.feat,fx:p.fx,fy:p.fy,autoFx:p.autoFx,autoFy:p.autoFy,zoom:p.zoom||1,blob:p.blob,cat:p.cat,catConf:p.catConf,catManual:p.catManual,catV:p.catV,sem:p.sem,emb:p.emb,usedPost:!!p.usedPost,lat:p.lat,lon:p.lon,excluded:!!p.excluded});
+const photoRec=p=>({id:p.id,name:p.name,t:p.t,key:p.key,feat:p.feat,fx:p.fx,fy:p.fy,autoFx:p.autoFx,autoFy:p.autoFy,zoom:p.zoom||1,blob:p.blob,cat:p.cat,catConf:p.catConf,catManual:p.catManual,catV:p.catV,sem:p.sem,emb:p.emb,usedPost:!!p.usedPost,dateSrc:p.dateSrc,lat:p.lat,lon:p.lon,excluded:!!p.excluded});
 /* Photos are written a few at a time: iPhones can reject one giant write even with space left. */
 function persist(){
   if(!DB.db||S.samples)return;
@@ -770,6 +787,7 @@ $('catSel').onchange=e=>{const p=S.sel&&S.photos.get(getRef(S.sel));if(!p)return
 function mostCommon(arr){const m=new Map();arr.forEach(x=>m.set(x,(m.get(x)||0)+1));let b=null,n=-1;m.forEach((v,k)=>{if(v>n){n=v;b=k}});return b}
 const sameDayKey=t=>{const d=new Date(t-5*3600e3);return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`};
 function timeOk(p,ps,mode){
+  if(farApart(p,ps))return false;
   if(S.trips.length){const tp=tripOf(p),tq=ps.map(tripOf);if(tp||tq.some(Boolean))return tq.some(x=>x&&tp&&x.id===tp.id)&&(mode!=='day'||ps.some(q=>sameDayKey(q.t)===sameDayKey(p.t)))}
   if(mode==='any')return true;
   if(mode==='trip')return ps.some(q=>sameOuting(p,q));
@@ -1021,11 +1039,11 @@ async function importFiles(files){
     $('storiesTitle').textContent=`Reading ${++done} of ${files.length}…`;
     try{
       const bmp=await createImageBitmap(f);
-      let t=f.lastModified||Date.now(),geo={};
-      if(window.exifr){try{const o=await exifr.parse(f,{pick:['DateTimeOriginal','CreateDate']});const dt=o&&(o.DateTimeOriginal||o.CreateDate);if(dt instanceof Date&&!isNaN(dt))t=dt.getTime()}catch(e){}
+      let t=f.lastModified||Date.now(),geo={},dateSrc='file';
+      if(window.exifr){try{const o=await exifr.parse(f,{pick:['DateTimeOriginal','CreateDate']});const dt=o&&(o.DateTimeOriginal||o.CreateDate);if(dt instanceof Date&&!isNaN(dt)){t=dt.getTime();dateSrc='photo'}}catch(e){}
         try{const g=await exifr.gps(f);if(g&&isFinite(g.latitude)&&isFinite(g.longitude)){geo={lat:g.latitude,lon:g.longitude}}}catch(e){}}
       const blob=await storeCopy(bmp);
-      const p=await photoFrom(bmp,{file:blob||f,blob,name:f.name,t,key,...geo});bmp.close();S.photos.set(p.id,p);ids.push(p.id);if(blob)DB.dirty.add(p.id);
+      const p=await photoFrom(bmp,{file:blob||f,blob,name:f.name,t,key,dateSrc,...geo});bmp.close();S.photos.set(p.id,p);ids.push(p.id);if(blob)DB.dirty.add(p.id);
     }catch(e){skipped++}
   }
   $('storiesTitle').textContent='Stories';
@@ -1049,10 +1067,13 @@ async function addFiles(list){
 }
 $('addBtn').onclick=()=>{loadRec();$('file').click()};
 $('file').onchange=e=>{addFiles(e.target.files);e.target.value=''};
-$('clearBtn').onclick=()=>twoTap($('clearBtn'),'Tap again to delete everything',()=>{
+function clearAll(){
   if(!S.samples)[...S.photos.keys()].forEach(id=>DB.gone.add(id));
-  S.photos.clear();S.stories=[];S.tray=[];S.sel=null;S.samples=false;DB.dirty.clear();render();
-});
+  S.photos.clear();S.stories=[];S.tray=[];S.sel=null;S.multi=null;S.samples=false;DB.dirty.clear();setPending(false);openSettings(false);render();
+  toast('All photos cleared. Your trips, category fixes and posted-photo memory are kept.');
+}
+$('clearBtn').onclick=()=>twoTap($('clearBtn'),'Tap again to clear all photos',clearAll);
+$('staleClear').onclick=()=>twoTap($('staleClear'),'Tap again to clear',clearAll);
 let dragN=0;
 addEventListener('dragenter',e=>{if([...e.dataTransfer.types].includes('Files')){dragN++;$('drop').hidden=false}});
 addEventListener('dragleave',()=>{if(--dragN<=0){dragN=0;$('drop').hidden=true}});
