@@ -147,6 +147,14 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
 .trayGrid button.inStory::after{content:"In a story";position:absolute;left:4px;bottom:4px;font-family:var(--f-cond);font-size:11px;font-weight:600;background:var(--paper-2);color:var(--ink);padding:1px 5px;border-radius:2px}
 .banner.stale{display:flex;gap:10px 16px;align-items:center;flex-wrap:wrap;font-style:normal;border-style:solid;border-color:var(--red)}
 .banner.stale span{flex:1 1 260px}
+.tabs{display:flex;gap:2px;margin-top:8px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:1 0 auto;border:none;border-bottom:2.5px solid transparent;border-radius:0;min-height:38px;padding:6px 8px;font-size:15px;font-weight:500;color:var(--muted)}
+.tabs button:hover{background:transparent;color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);font-weight:700;border-bottom-color:var(--ink)}
+.tabs span{font-family:var(--f-cond);font-weight:500;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tabs span:empty{display:none}
+.secEmpty{grid-column:1/-1;padding:28px 12px;text-align:center;color:var(--muted);font-style:italic;border:1px dashed var(--hair)}
 .row.trips{grid-column:1/-1;align-items:flex-start;flex-direction:column}
 .tripList{display:flex;gap:6px;flex-wrap:wrap}
 .tripChip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--ink);border-radius:4px;padding:3px 4px 3px 10px;font-family:var(--f-cond);font-size:14px}
@@ -195,6 +203,12 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
     <button id="remixBtn">Fill gaps</button>
     <button id="setBtn" aria-expanded="false" aria-controls="setPanel">Arrange</button>
   </div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="tab-stories" data-tab="stories">Stories <span id="tc-stories"></span></button>
+    <button role="tab" id="tab-later" data-tab="later">For later <span id="tc-later"></span></button>
+    <button role="tab" id="tab-done" data-tab="done">Done <span id="tc-done"></span></button>
+    <button role="tab" id="tab-hidden" data-tab="hidden">Hidden <span id="tc-hidden"></span></button>
+  </nav>
   <section class="setPanel" id="setPanel" hidden aria-label="Arrange stories">
   <div class="controls">
     <div class="row"><span class="lbl" id="l-tiles">Photos per story</span>
@@ -236,7 +250,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
         <button class="primary" type="submit" id="tripSave">Add</button>
       </form>
     </div>
-    <label class="row sw"><span class="lbl">Pair contrasting vibes</span><input type="checkbox" id="mix" role="switch"></label>
+    <label class="row sw"><span class="lbl">Mix light and dark (day + night)</span><input type="checkbox" id="mix" role="switch"></label>
     <label class="row sw"><span class="lbl">Thin lines between photos</span><input type="checkbox" id="lines" role="switch"></label>
   </div>
   <p class="recStatus" id="recStatus" hidden></p>
@@ -264,7 +278,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
   <div id="sampleNote" class="banner" hidden>Sample photos. Add yours to replace them.</div>
   <div id="staleNote" class="banner stale" hidden><span><b>Some photos were added before Story Grid could read their dates,</b> so they may be grouped with the wrong day or trip. Clear them and add them again.</span><button class="primary" id="staleClear">Clear all photos</button></div>
 
-  <section style="display:flex;flex-direction:column;gap:14px">
+  <section style="display:flex;flex-direction:column;gap:14px" id="storiesSec">
     <div class="secHead">
       <div class="ttl"><h2 id="storiesTitle">Stories</h2></div>
       <span class="count" id="count"></span>
@@ -524,8 +538,9 @@ function build(keepAll){
   const twins=[];avail=avail.sort((a,b)=>a.t-b.t).filter(p=>{const tw=keepers.find(q=>isTwin(p,q));p.twin=tw?tw.id:null;if(tw){twins.push(p);return false}keepers.push(p);return true});
   S.stories=kept.slice();S.tray=[];S.sel=null;
   for(const tpart of partition(avail,st.time))for(const fam of groupBy(tpart,p=>st.cats==='off'?'all':famOf(p))){
+    for(const part of(st.cats==='exact'?groupBy(fam,catOf):[fam])){
     const pool=[];
-    for(const part of(st.cats==='exact'?groupBy(fam,catOf):[fam]))for(const cl of cluster(part,T)){
+    for(const cl of cluster(part,T)){
       const s=cl.items.length,n=st.tiles==='auto'?pickAuto(s):+st.tiles;
       if(!n||s<n){pool.push({items:cl.items.slice()});continue}
       const k=Math.floor(s/n),r=s-k*n;
@@ -535,36 +550,45 @@ function build(keepAll){
       for(let i=0;i<k;i++)S.stories.push(makeStory(keep.slice(i*n,(i+1)*n).map(p=>p.id),n,'match'));
       if(left.length)pool.push({items:left});
     }
-    if(st.mix)mixPool(pool,st);
-    pool.forEach(g=>g.items.forEach(p=>S.tray.push(p.id)));
-  }
+    let rest=pool.flatMap(g=>g.items);
+    if(st.mix)rest=contrastFill(rest,st);
+    rest=closestFill(rest,st,T);
+    rest.forEach(p=>S.tray.push(p.id));
+  }}
   twins.forEach(p=>S.tray.push(p.id));S.lastTwins=twins.length;
   S.stories.sort((a,b)=>firstT(a)-firstT(b));
   return S.stories.length-before;
 }
-function mixPool(pool,st){
+/* Leftovers from the same subject and outing become stories built around their closest tone matches. */
+function closestFill(list,st,T){
+  const cap=T*2.6,rest=[];list=[...list].sort((a,b)=>a.t-b.t);
+  while(list.length){
+    const n=st.tiles==='auto'?largestFit(list.length):+st.tiles;
+    if(!n||list.length<n){rest.push(...list);break}
+    const seed=list.shift(),sv=pvec(seed);
+    const near=list.map(p=>({p,d:dist(pvec(p),sv)})).filter(x=>x.d<=cap).sort((a,b)=>a.d-b.d).slice(0,n-1);
+    if(near.length<n-1){rest.push(seed);continue}
+    const pick=[seed,...near.map(x=>x.p)];list=list.filter(p=>!pick.includes(p));
+    pick.sort((a,b)=>a.t-b.t);S.stories.push(makeStory(pick.map(p=>p.id),n,'match'));
+  }
+  return rest;
+}
+/* Contrast pairing: light photos against dark ones (day and night), laid out in a checkerboard. Same subject, same outing. */
+const isLight=p=>p.feat.lum>=0.4,isDark=p=>p.feat.lum<0.3;
+function contrastFill(list,st){
+  let light=list.filter(isLight),dark=list.filter(isDark);const mid=list.filter(p=>!isLight(p)&&!isDark(p));
   for(;;){
-    const groups=pool.filter(g=>g.items.length);
-    if(groups.length<2)return;
-    const total=groups.reduce((s,g)=>s+g.items.length,0);
-    const n=st.tiles==='auto'?largestFit(total):+st.tiles;
-    if(!n||total<n)return;
-    groups.forEach(g=>g.c=centroid(g.items));
-    if(S.shake)groups.forEach(g=>shuffle(g.items));
-    groups.sort((a,b)=>b.items.length-a.items.length);
-    const A=groups[0];let B=null,bd=-1;
-    for(const g of groups.slice(1)){const d=dist(A.c,g.c);if(d>bd){bd=d;B=g}}
-    const half=Math.ceil(n/2);
-    const a=A.items.splice(0,Math.min(half,A.items.length));
-    const b=B.items.splice(0,Math.min(n-a.length,B.items.length));
-    if(a.length+b.length<n)a.push(...A.items.splice(0,n-a.length-b.length));
-    const others=groups.filter(g=>g!==A&&g!==B).sort((x,y)=>dist(A.c,y.c)-dist(A.c,x.c));
-    for(const g of others){if(a.length+b.length>=n)break;b.push(...g.items.splice(0,n-a.length-b.length))}
+    const n=st.tiles==='auto'?largestFit(light.length+dark.length):+st.tiles;
+    if(!n)break;const half=Math.floor(n/2),need=n-half;
+    if(light.length<need||dark.length<half)break;
+    const take=(arr,k)=>{const sv=pvec(arr[0]);const s=arr.map(p=>({p,d:dist(pvec(p),sv)})).sort((a,b)=>a.d-b.d).slice(0,k).map(x=>x.p);return s};
+    const a=take(light,need),b=take(dark,half);light=light.filter(p=>!a.includes(p));dark=dark.filter(p=>!b.includes(p));
     a.sort((x,y)=>x.t-y.t);b.sort((x,y)=>x.t-y.t);
     const[cols,rows]=LAYOUT[n],ids=[];let ia=0,ib=0;
     for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const wantA=(r+c)%2===0;if((wantA&&ia<a.length)||ib>=b.length)ids.push(a[ia++].id);else ids.push(b[ib++].id)}
-    S.stories.push(makeStory(ids,n,'mix',{names:[moodName(meanFeat(a)),moodName(meanFeat(b))]}));
+    S.stories.push(makeStory(ids,n,'mix',{names:['Day','night']}));
   }
+  return light.concat(dark,mid);
 }
 function firstT(st){let m=Infinity;st.slots.forEach(id=>{const p=S.photos.get(id);if(p&&p.t<m)m=p.t});return m}
 
@@ -629,7 +653,7 @@ function dateSpan(st){
 function storyName(st){
   const ps=st.slots.map(id=>S.photos.get(id)).filter(Boolean);if(!ps.length)return'Empty story';
   const cs=new Set(ps.map(catOf)),fs=new Set(ps.map(famOf));const pre=cs.size===1&&!cs.has('unknown')?CAT_LABEL[[...cs][0]]+' · ':fs.size===1&&!fs.has('unknown')?({places:'Out & about',food:'Food & drinks',culture:'Culture'}[[...fs][0]]||CAT_LABEL[[...cs][0]])+' · ':'';
-  if(st.kind==='mix'&&st.names)return pre+(st.names[0]===st.names[1]?st.names[0]+' mix':`${st.names[0]} + ${st.names[1]}`);
+  if(st.kind==='mix'&&st.names)return pre+'Day + night';
   return pre+moodName(meanFeat(ps));
 }
 
@@ -691,11 +715,27 @@ function render(){
   if(S.multi){const n=S.multi.ids.size,all=multiPool().length;$('mText').textContent=`${n} selected`;$('mAll').textContent=n===all&&all?'Select none':'Select all';
     $('mNever').hidden=S.multi.kind!=='tray';$('mUse').hidden=S.multi.kind!=='hidden';['mNever','mUse','mDel'].forEach(k=>$(k).disabled=!n);}
   $('mbar').hidden=!S.multi;if(S.multi)$('bar').hidden=true;
+  applyTabs();
   const sp=S.sel&&S.photos.get(getRef(S.sel));$('catSel').hidden=!sp;if(sp)$('catSel').value=catOf(sp);
   const gaps=S.stories.reduce((n,s)=>n+s.slots.filter(x=>!x).length,0);$('remixBtn').hidden=!gaps;document.querySelector('.toolbar').classList.toggle('gaps',gaps>0);$('remixBtn').textContent=`Fill ${gaps} gap${gaps>1?'s':''}`;$('regroupBtn').hidden=!S.photos.size;
   $('clearSaved').hidden=!S.stories.some(s=>s.saved);
   schedulePersist();
 }
+let TAB='stories';try{TAB=localStorage.getItem('sg-tab')||'stories'}catch(e){}
+const TABSEC={stories:'storiesSec',later:'traySec',done:'savedSec',hidden:'hidSec'};
+function applyTabs(){
+  const nS=S.stories.filter(s=>!s.saved).length,nD=S.stories.length-nS,nL=S.tray.length,nH=[...S.photos.values()].filter(p=>p.excluded).length;
+  const counts={stories:nS,later:nL,done:nD,hidden:nH};
+  Object.entries(counts).forEach(([k,v])=>{$('tc-'+k).textContent=v?String(v):''});
+  $('tab-hidden').hidden=!nH&&TAB!=='hidden';
+  Object.entries(TABSEC).forEach(([k,id])=>{const sec=$(id),on=k===TAB;sec.hidden=!on;$('tab-'+k).setAttribute('aria-selected',String(on));
+    const grid=sec.querySelector('.stories,.trayGrid');if(!grid)return;let e=grid.querySelector('.secEmpty');
+    const empty=k==='stories'?false:!counts[k];
+    if(empty&&!e){e=document.createElement('p');e.className='secEmpty';e.textContent={later:'Nothing set aside.',done:'No saved stories yet.',hidden:'Nothing hidden.'}[k];grid.appendChild(e)}
+    if(!empty&&e)e.remove()});
+}
+function setTab(k){TAB=k;try{localStorage.setItem('sg-tab',k)}catch(e){}if(S.multi)S.multi=null;render();window.scrollTo({top:0})}
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 function twoTap(b,label,fn){
   if(b.dataset.armed){delete b.dataset.armed;clearTimeout(b._t);b.textContent=b.dataset.orig;fn();return}
   b.dataset.orig=b.textContent;b.dataset.armed='1';b.textContent=label;
@@ -771,7 +811,7 @@ function tapSlot(ref){
   if(ref.type==='story'){const s=S.stories.find(x=>x.id===ref.sid);if(s&&s.saved){toast('This story is saved. Tap Edit to change it.');return}}
   if(ref.type==='hidden'){S.sel=S.sel&&same(S.sel,ref)?null:ref;render();return}
   if(S.sel&&S.sel.type==='hidden')S.sel=null;
-  if(!S.sel){if(getRef(ref)){S.sel=ref;render()}else if(ref.type==='story')openPicker(ref);return}
+  if(!S.sel){if(getRef(ref)){S.sel=ref;if(ref.type==='tray'){TAB='stories';render();toast('Now tap a spot in a story to place it.')}else render()}else if(ref.type==='story')openPicker(ref);return}
   if(same(S.sel,ref)){S.sel=null;render();return}
   const a=S.sel,b=ref;
   if(a.type==='tray'&&b.type==='tray'){S.sel=ref;render();return}
