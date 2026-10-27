@@ -155,6 +155,22 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
 .tabs span{font-family:var(--f-cond);font-weight:500;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .tabs span:empty{display:none}
 .secEmpty{grid-column:1/-1;padding:28px 12px;text-align:center;color:var(--muted);font-style:italic;border:1px dashed var(--hair)}
+#savedStories{grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:16px 10px}
+#savedStories .frame{border-width:2px}
+#savedStories .meta{flex-direction:column;gap:0}
+#savedStories .meta .name{font-size:13px}
+#savedStories .meta .when{font-size:12px;white-space:normal}
+#savedStories .actions{gap:4px}
+#savedStories .actions button{font-size:12px;min-height:30px;padding:3px 7px}
+.postedGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:12px 10px}
+.postedItem{position:relative;display:flex;flex-direction:column;gap:4px;min-width:0}
+.postedItem img{width:100%;aspect-ratio:9/16;object-fit:cover;border:2px solid var(--film);display:block}
+.postedItem span{font-family:var(--f-cond);font-size:12px;color:var(--muted)}
+.postedItem button{position:absolute;top:4px;right:4px;min-height:28px;width:28px;padding:0;border-radius:50%;background:var(--paper);font-size:16px;line-height:1}
+.postedEmpty{grid-column:1/-1;margin:0;font-size:15px;color:var(--muted);font-style:italic}
+.groupHead{grid-column:1/-1;margin:6px 0 -14px;font-family:var(--f-serif);font-weight:600;font-size:18px;border-bottom:1px solid var(--hair);padding-bottom:4px}
+.groupHead:first-child{margin-top:0}
+.row .lbl .sub{display:block;font-family:var(--f-cond);font-weight:400;font-size:13px;color:var(--muted)}
 .row.trips{grid-column:1/-1;align-items:flex-start;flex-direction:column}
 .tripList{display:flex;gap:6px;flex-wrap:wrap}
 .tripChip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--ink);border-radius:4px;padding:3px 4px 3px 10px;font-family:var(--f-cond);font-size:14px}
@@ -207,7 +223,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
     <button role="tab" id="tab-stories" data-tab="stories">Stories <span id="tc-stories"></span></button>
     <button role="tab" id="tab-later" data-tab="later">For later <span id="tc-later"></span></button>
     <button role="tab" id="tab-done" data-tab="done">Done <span id="tc-done"></span></button>
-    <button role="tab" id="tab-hidden" data-tab="hidden">Hidden <span id="tc-hidden"></span></button>
+    <button role="tab" id="tab-hidden" data-tab="hidden">Never use <span id="tc-hidden"></span></button>
   </nav>
   <section class="setPanel" id="setPanel" hidden aria-label="Arrange stories">
   <div class="controls">
@@ -221,11 +237,11 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
         <label><input type="radio" name="tiles" id="t-15" value="15"><span>15</span></label>
         <label><input type="radio" name="tiles" id="t-20" value="20"><span>20</span></label>
       </div></div>
-    <div class="row"><span class="lbl" id="l-time">Keep together</span>
+    <div class="row"><span class="lbl" id="l-time">Keep together <small class="sub">outside trips</small></span>
       <div class="seg" role="radiogroup" aria-labelledby="l-time">
         <label><input type="radio" name="time" id="tm-day" value="day"><span>Day</span></label>
-        <label><input type="radio" name="time" id="tm-trip" value="trip" checked><span>Outing</span></label>
-        <label><input type="radio" name="time" id="tm-month" value="month"><span>Month</span></label>
+        <label><input type="radio" name="time" id="tm-trip" value="trip"><span>Outing</span></label>
+        <label><input type="radio" name="time" id="tm-month" value="month" checked><span>Month</span></label>
         <label><input type="radio" name="time" id="tm-any" value="any"><span>Any</span></label>
       </div></div>
     <div class="row"><span class="lbl" id="l-vibe">Vibe match</span>
@@ -257,7 +273,6 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
   <p class="recStatus" id="storeInfo"></p>
   <div class="panelFoot">
     <div class="tools">
-      <button class="ghost" id="checkBtn">Check a posted collage</button>
       <button class="ghost" id="regroupBtn">Reshuffle all</button>
       <button class="ghost danger" id="clearBtn">Clear all photos</button>
       <input type="file" id="fileCollage" accept="image/*" multiple hidden>
@@ -287,8 +302,12 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
   </section>
 
   <section class="tray" id="savedSec" hidden>
-    <div class="secHead"><div class="ttl"><h2>Done</h2></div><div class="add"><span class="count" id="savedCount"></span><button id="clearSaved">Clear done</button></div></div>
-    <div class="stories" id="savedStories"></div>
+    <div class="secHead"><div class="ttl"><h2>Saved collages</h2></div><div class="add"><span class="count" id="savedCount"></span><button id="clearSaved">Clear saved</button></div></div>
+    <div class="stories compact" id="savedStories"></div>
+    <div class="secHead"><div class="ttl"><h2>Posted collages</h2></div><div class="add"><button id="checkBtn">+ Add a posted collage</button></div></div>
+    <div class="postedGrid" id="postedGrid"></div>
+    <div class="secHead" id="usedHead"><div class="ttl"><h2>Already posted photos</h2></div><span class="count" id="usedCount"></span></div>
+    <div class="trayGrid" id="usedGrid"></div>
   </section>
 
   <section class="tray" id="traySec">
@@ -296,7 +315,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
     <div class="trayGrid" id="tray"></div>
   </section>
   <section class="tray" id="hidSec" hidden>
-    <div class="secHead"><div class="ttl"><h2>Hidden</h2></div><div class="add"><span class="count" id="hidCount"></span><button id="selHid">Select</button></div></div>
+    <div class="secHead"><div class="ttl"><h2>Never use</h2></div><div class="add"><span class="count" id="hidCount"></span><button id="selHid">Select</button></div></div>
     <div class="trayGrid dim" id="hid"></div>
   </section>
 </div>
@@ -358,7 +377,7 @@ const SIZES=[4,6,9,12,15,20];
 const LAYOUT={4:[2,2],6:[2,3],9:[3,3],12:[3,4],15:[3,5],20:[4,5]};
 const W=1080,H=1920;
 const VIBE_T={strict:0.17,balanced:0.27,loose:0.4};
-const S={photos:new Map(),stories:[],tray:[],sel:null,nextId:1,samples:false,used:[],multi:null,trips:[],manualCats:[]};
+const S={photos:new Map(),stories:[],tray:[],sel:null,nextId:1,samples:false,used:[],multi:null,trips:[],manualCats:[],posted:[]};
 const cos=(a,b)=>{let s=0;for(let i=0;i<512;i++)s+=a[i]*b[i];return s};
 const $=id=>document.getElementById(id);
 const CAT_NAMES=["scenery", "streets", "buildings", "culture", "art", "food", "drinks", "night", "wellness", "style", "people", "animals", "transit"];const CAT_V=3;
@@ -533,7 +552,7 @@ function build(keepAll){
   const st=settings(),T=VIBE_T[st.vibe];
   const kept=keepAll?S.stories:S.stories.filter(s=>s.saved);
   const used=new Set();kept.forEach(s=>s.slots.forEach(id=>{if(id)used.add(id)}));
-  let avail=[...S.photos.values()].filter(p=>!used.has(p.id)&&!p.excluded);const before=kept.length;
+  let avail=[...S.photos.values()].filter(p=>!used.has(p.id)&&!p.excluded&&!p.usedPost);const before=kept.length;
   const keepers=[];kept.forEach(s=>s.slots.forEach(id=>{const p=S.photos.get(id);if(p)keepers.push(p)}));
   const twins=[];avail=avail.sort((a,b)=>a.t-b.t).filter(p=>{const tw=keepers.find(q=>isTwin(p,q));p.twin=tw?tw.id:null;if(tw){twins.push(p);return false}keepers.push(p);return true});
   S.stories=kept.slice();S.tray=[];S.sel=null;
@@ -641,6 +660,11 @@ function dateLabel(st){
   const tps=st.slots.map(id=>S.photos.get(id)).filter(Boolean).map(tripOf),tn=tps.length&&tps.every(x=>x&&x.id===tps[0].id)&&!(S.tripSplit&&S.tripSplit[tps[0].id])?tps[0].name+' \u00b7 ':'';
   return tn+dateSpan(st);
 }
+function storyGroup(st){
+  const ps=st.slots.map(id=>S.photos.get(id)).filter(Boolean);if(!ps.length)return'Unsorted';
+  const tps=ps.map(tripOf);if(tps[0]&&tps.every(x=>x&&x.id===tps[0].id))return `${tps[0].name} \u00b7 ${fmtDay(tps[0].start)}\u2013${fmtDay(tps[0].end)}`;
+  const d=new Date(Math.min(...ps.map(p=>p.t)));return d.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+}
 function dateSpan(st){
   const ts=st.slots.map(id=>S.photos.get(id)).filter(Boolean).map(p=>p.t).sort((a,b)=>a-b);
   if(!ts.length)return'';const a=new Date(ts[0]),b=new Date(ts[ts.length-1]);
@@ -663,12 +687,14 @@ function render(){
   const stale=[...S.photos.values()].filter(p=>!p.sample&&!p.dateSrc).length;$('staleNote').hidden=!stale;
   const nSaved=S.stories.filter(s=>s.saved).length;$('savedSec').hidden=!nSaved;$('savedCount').textContent=nSaved?`${nSaved} stor${nSaved>1?'ies':'y'}`:'';
   const total=S.photos.size,used=S.stories.reduce((s,st)=>s+st.slots.filter(Boolean).length,0);
-  $('count').textContent=total?`${S.stories.length} ${S.stories.length===1?'story':'stories'} · ${used}/${total} photos`:'';
+  $('count').textContent=total?`${S.stories.filter(s=>!s.saved).length} to finish · ${total} photos`:'';
   $('sampleNote').hidden=!S.samples;
   if(!total){box.innerHTML='<button class="emptyAdd" id="emptyAdd">+ Add photos<small>Pick a batch from your camera roll</small></button>';$('emptyAdd').onclick=()=>$('addBtn').click()}
   else if(S.stories.length&&nSaved===S.stories.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">All saved.</div>'}
   else if(!S.stories.length){box.innerHTML='<div class="empty" style="grid-column:1/-1">Not enough similar photos yet. Try fewer per story in Arrange.</div>'}
+  let lastGroup=null;
   S.stories.forEach(st=>{
+    if(!st.saved){const g=storyGroup(st);if(g!==lastGroup){lastGroup=g;const h=document.createElement('h3');h.className='groupHead';h.textContent=g;box.appendChild(h)}}
     const card=document.createElement('div');card.className='card';
     const fStart=S.stories.slice(0,S.stories.indexOf(st)).reduce((t,x)=>t+x.n,0)+1,pad=n=>String(n).padStart(2,'0');
     const strip=document.createElement('div');strip.className='strip';strip.innerHTML=`<span>${pad(fStart)}A &#9656; ${pad(fStart+st.n-1)}A</span><span>${st.cols}&times;${st.rows}</span>`;
@@ -684,7 +710,7 @@ function render(){
     const act=document.createElement('div');act.className='actions';
     const empty=st.slots.some(id=>!id);
     const del=btn('Delete',()=>twoTap(del,'Tap again to delete',()=>{S.stories=S.stories.filter(x=>x!==st);deletePhotos(st.slots.filter(Boolean));S.sel=null;render()}));
-    if(st.saved)act.append(btn('Save again',()=>saveStory(st)),btn('Edit',()=>{st.saved=false;S.sel=null;render();toast('Moved back to Stories to edit.')}),del);
+    if(st.saved)act.append(btn('Save again',()=>saveStory(st)),btn('Edit',()=>{st.saved=false;st.slots.forEach(id=>{const p=S.photos.get(id);if(p&&p.usedPost){p.usedPost=false;DB.dirty.add(id)}});S.sel=null;render();toast('Moved back to Stories to edit.')}),del);
     else act.append(btn('Save',()=>saveStory(st),empty,true),btn('Shuffle',()=>{shuffle(st.slots);st.saved=false;S.sel=null;render()}),btn('Break apart',()=>{st.slots.filter(Boolean).forEach(id=>S.tray.push(id));S.stories=S.stories.filter(x=>x!==st);S.sel=null;render()}),del);
     card.append(fr,meta,act);
     (st.saved?sbox:box).appendChild(card);
@@ -700,15 +726,30 @@ function render(){
   $('bar').hidden=!S.sel;$('toTray').hidden=!storySel;$('cropBtn').hidden=!storySel;$('replaceBtn').hidden=!storySel;
   const sp0=S.sel&&S.photos.get(getRef(S.sel));const info=sp0?` \u00b7 ${new Date(sp0.t).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}${sp0.dateSrc==='file'?' (no photo date)':''}${hasGeo(sp0)?'':' \u00b7 no location'}`:'';
   $('barText').textContent=(storySel?'Tap another to swap':'Tap a spot to place it')+info;
-  const hidSel=!!(S.sel&&S.sel.type==='hidden');
-  if(hidSel)$('barText').textContent='Hidden';
-  $('delPhoto').hidden=!(S.sel&&(S.sel.type==='tray'||hidSel));
-  $('neverBtn').hidden=!S.sel||hidSel;$('useAgain').hidden=!hidSel;
+  const hidSel=!!(S.sel&&S.sel.type==='hidden'),postSel=!!(S.sel&&S.sel.type==='posted');
+  if(hidSel)$('barText').textContent='Never use';if(postSel)$('barText').textContent='Already posted';
+  $('delPhoto').hidden=!(S.sel&&(S.sel.type==='tray'||hidSel||postSel));
+  $('neverBtn').hidden=!S.sel||hidSel||postSel;$('useAgain').hidden=!(hidSel||postSel);
+  if(postSel){$('cropBtn').hidden=true;$('replaceBtn').hidden=true;$('toTray').hidden=true}
+  /* Done tab: posted collages and photos already used */
+  const inAny=new Set();S.stories.forEach(s=>s.slots.forEach(id=>{if(id)inAny.add(id)}));
+  const usedPh=[...S.photos.values()].filter(p=>p.usedPost&&!p.excluded&&!inAny.has(p.id));
+  $('usedCount').textContent=usedPh.length?`${usedPh.length} photo${usedPh.length>1?'s':''}`:'';$('usedHead').hidden=!usedPh.length;
+  const ug=$('usedGrid');ug.innerHTML='';ug.hidden=!usedPh.length;
+  usedPh.forEach(p=>{const b=document.createElement('button');b.setAttribute('aria-label','Already posted photo '+p.name);b.classList.add('used');
+    if(postSel&&S.sel.pid===p.id)b.classList.add('sel');const im=document.createElement('img');im.src=p.thumbURL;im.alt='';b.appendChild(im);
+    b.onclick=()=>tapSlot({type:'posted',pid:p.id});ug.appendChild(b)});
+  const pg=$('postedGrid');pg.innerHTML='';
+  if(!S.posted.length){const e=document.createElement('p');e.className='postedEmpty';e.textContent="Add a collage you've already posted. Its photos won't be used again.";pg.appendChild(e)}
+  S.posted.forEach(pc=>{const d=document.createElement('div');d.className='postedItem';const im=document.createElement('img');im.src=pc.url;im.alt='Posted collage';
+    const s=document.createElement('span');s.textContent='Added '+new Date(pc.t).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const x=document.createElement('button');x.textContent='\u00d7';x.setAttribute('aria-label','Remove this posted collage');
+    x.onclick=()=>twoTap(x,'?',()=>{S.posted=S.posted.filter(q=>q!==pc);render()});d.append(im,s,x);pg.appendChild(d)});
   const hid=[...S.photos.values()].filter(p=>p.excluded);
   $('hidSec').hidden=!hid.length;$('hidCount').textContent=hid.length?`${hid.length} photo${hid.length>1?'s':''}`:'';
   const hg=$('hid');hg.innerHTML='';
   hid.forEach(p=>{const b=document.createElement('button');b.setAttribute('aria-label','Hidden photo '+p.name);
-    if(hidSel&&S.sel.pid===p.id)b.classList.add('sel');if(p.usedPost)b.classList.add('used');
+    if(hidSel&&S.sel.pid===p.id)b.classList.add('sel');
     const mH=S.multi&&S.multi.kind==='hidden';if(mH&&S.multi.ids.has(p.id))b.classList.add('pick');
     const im=document.createElement('img');im.src=p.thumbURL;im.alt='';b.appendChild(im);b.onclick=()=>mH?toggleMulti(p.id):tapSlot({type:'hidden',pid:p.id});hg.appendChild(b)});
   hg.classList.toggle('multi',!!(S.multi&&S.multi.kind==='hidden'));
@@ -724,7 +765,7 @@ function render(){
 let TAB='stories';try{TAB=localStorage.getItem('sg-tab')||'stories'}catch(e){}
 const TABSEC={stories:'storiesSec',later:'traySec',done:'savedSec',hidden:'hidSec'};
 function applyTabs(){
-  const nS=S.stories.filter(s=>!s.saved).length,nD=S.stories.length-nS,nL=S.tray.length,nH=[...S.photos.values()].filter(p=>p.excluded).length;
+  const nS=S.stories.filter(s=>!s.saved).length,nD=S.stories.length-nS+S.posted.length,nL=S.tray.length,nH=[...S.photos.values()].filter(p=>p.excluded).length;
   const counts={stories:nS,later:nL,done:nD,hidden:nH};
   Object.entries(counts).forEach(([k,v])=>{$('tc-'+k).textContent=v?String(v):''});
   $('tab-hidden').hidden=!nH&&TAB!=='hidden';
@@ -762,7 +803,7 @@ function persist(){
   }
   try{const tx=DB.db.transaction(['photos','state'],'readwrite');
     gone.forEach(id=>tx.objectStore('photos').delete(id));
-    tx.objectStore('state').put({id:'main',stories:S.stories.map(s=>({...s,slots:s.slots.slice()})),tray:S.tray.slice(),nextId:S.nextId,used:S.used,trips:S.trips,manualCats:S.manualCats});
+    tx.objectStore('state').put({id:'main',stories:S.stories.map(s=>({...s,slots:s.slots.slice()})),tray:S.tray.slice(),nextId:S.nextId,used:S.used,trips:S.trips,manualCats:S.manualCats,posted:S.posted});
     tx.onabort=()=>{gone.forEach(id=>DB.gone.add(id));saveFailed(tx.error)};
   }catch(e){saveFailed(e)}
 }
@@ -790,9 +831,11 @@ async function init(){
       $('storiesTitle').textContent='Restoring your photos…';
       for(const r of recs){try{const bmp=await createImageBitmap(r.blob);const th=makeThumbs(bmp);bmp.close();S.photos.set(r.id,{...r,file:r.blob,...th})}catch(e){}}
       $('storiesTitle').textContent='Stories';
-      if(state){S.used=state.used||[];S.trips=state.trips||[];S.manualCats=state.manualCats||[];S.nextId=Math.max(state.nextId||1,S.nextId);S.stories=(state.stories||[]).map(s=>({...s,slots:s.slots.map(id=>S.photos.has(id)?id:null)}));S.tray=(state.tray||[]).filter(id=>S.photos.has(id)&&!S.photos.get(id).excluded)}
+      if(state){S.posted=state.posted||[];S.used=state.used||[];S.trips=state.trips||[];S.manualCats=state.manualCats||[];S.nextId=Math.max(state.nextId||1,S.nextId);S.stories=(state.stories||[]).map(s=>({...s,slots:s.slots.map(id=>S.photos.has(id)?id:null)}));S.tray=(state.tray||[]).filter(id=>S.photos.has(id)&&!S.photos.get(id).excluded)}
       const placed=new Set(S.tray);S.stories.forEach(s=>s.slots.forEach(id=>{if(id)placed.add(id)}));
-      S.photos.forEach((p,id)=>{if(!placed.has(id)&&!p.excluded)S.tray.push(id)});
+      S.photos.forEach(p=>{if(p.usedPost&&p.excluded){p.excluded=false;DB.dirty.add(p.id)}});
+      S.tray=S.tray.filter(id=>!S.photos.get(id).usedPost);
+      S.photos.forEach((p,id)=>{if(!placed.has(id)&&!p.excluded&&!p.usedPost)S.tray.push(id)});
       render();
       const need=[...S.photos.values()].filter(p=>!p.cat||p.catV!==CAT_V||!p.emb).map(p=>p.id);
       if(need.length)runRecognition(need).then(()=>{render();if(REC.ok)toast('Photos re-sorted. Use Reshuffle all in Arrange to regroup.')});else loadRec();
@@ -805,12 +848,12 @@ function btn(t,fn,dis,primary){const b=document.createElement('button');b.textCo
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}}
 
 /* ---------- editing ---------- */
-const getRef=r=>r.type==='tray'||r.type==='hidden'?r.pid:S.stories.find(s=>s.id===r.sid).slots[r.idx];
+const getRef=r=>r.type==='tray'||r.type==='hidden'||r.type==='posted'?r.pid:S.stories.find(s=>s.id===r.sid).slots[r.idx];
 function same(a,b){return a.type===b.type&&(a.type==='tray'?a.pid===b.pid:a.sid===b.sid&&a.idx===b.idx)}
 function tapSlot(ref){
   if(ref.type==='story'){const s=S.stories.find(x=>x.id===ref.sid);if(s&&s.saved){toast('This story is saved. Tap Edit to change it.');return}}
-  if(ref.type==='hidden'){S.sel=S.sel&&same(S.sel,ref)?null:ref;render();return}
-  if(S.sel&&S.sel.type==='hidden')S.sel=null;
+  if(ref.type==='hidden'||ref.type==='posted'){S.sel=S.sel&&same(S.sel,ref)?null:ref;render();return}
+  if(S.sel&&(S.sel.type==='hidden'||S.sel.type==='posted'))S.sel=null;
   if(!S.sel){if(getRef(ref)){S.sel=ref;if(ref.type==='tray'){TAB='stories';render();toast('Now tap a spot in a story to place it.')}else render()}else if(ref.type==='story')openPicker(ref);return}
   if(same(S.sel,ref)){S.sel=null;render();return}
   const a=S.sel,b=ref;
@@ -821,7 +864,7 @@ function tapSlot(ref){
 }
 $('cancelSel').onclick=()=>{S.sel=null;render()};
 $('toTray').onclick=()=>{const r=S.sel;if(!r||r.type!=='story')return;const st=S.stories.find(s=>s.id===r.sid);S.tray.push(st.slots[r.idx]);st.slots[r.idx]=null;st.saved=false;S.sel=null;render()};
-$('delPhoto').onclick=()=>twoTap($('delPhoto'),'Tap again to delete',()=>{const r=S.sel;if(r&&(r.type==='tray'||r.type==='hidden')){deletePhotos([r.pid]);S.sel=null;render()}});
+$('delPhoto').onclick=()=>twoTap($('delPhoto'),'Tap again to delete',()=>{const r=S.sel;if(r&&(r.type==='tray'||r.type==='hidden'||r.type==='posted')){deletePhotos([r.pid]);S.sel=null;render()}});
 $('clearSaved').onclick=()=>twoTap($('clearSaved'),'Tap again to clear',()=>{const gone=S.stories.filter(s=>s.saved);S.stories=S.stories.filter(s=>!s.saved);deletePhotos(gone.flatMap(s=>s.slots.filter(Boolean)));S.sel=null;render();toast(`Cleared ${gone.length} saved stor${gone.length>1?'ies':'y'}.`)});
 $('catSel').onchange=e=>{const p=S.sel&&S.photos.get(getRef(S.sel));if(!p)return;p.catManual=e.target.value;DB.dirty.add(p.id);if(p.emb){S.manualCats=S.manualCats.filter(m=>cos(m.e,p.emb)<0.95);S.manualCats.push({e:p.emb,cat:p.catManual})}render();toast(`Set to ${CAT_LABEL[p.catManual]}. Tap Remix to regroup with it.`)};
 function mostCommon(arr){const m=new Map();arr.forEach(x=>m.set(x,(m.get(x)||0)+1));let b=null,n=-1;m.forEach((v,k)=>{if(v>n){n=v;b=k}});return b}
@@ -843,7 +886,7 @@ function fillEmpty(){
     if(!ps.length){unfilled+=empties.length;continue}
     const c=centroid(ps),fam=mostCommon(ps.map(famOf)),cat=mostCommon(ps.map(catOf));
     const inStory=new Set();S.stories.forEach(s=>s.slots.forEach(id=>{if(id)inStory.add(id)}));
-    const fits=p=>p&&!p.excluded&&!(p.twin&&inStory.has(p.twin))&&timeOk(p,ps,st.time)&&(st.cats==='off'||(st.cats==='exact'?catOf(p)===cat:famOf(p)===fam));
+    const fits=p=>p&&!p.excluded&&!p.usedPost&&!(p.twin&&inStory.has(p.twin))&&timeOk(p,ps,st.time)&&(st.cats==='off'||(st.cats==='exact'?catOf(p)===cat:famOf(p)===fam));
     for(const idx of empties){
       let best=null,bd=Infinity;
       for(const id of S.tray){const p=S.photos.get(id);if(!fits(p))continue;const d=dist(pvec(p),c);if(d<bd){bd=d;best=p}}
@@ -868,8 +911,8 @@ $('neverBtn').onclick=()=>{
   toast('Won\'t be used. Find it under Hidden.');
 };
 $('useAgain').onclick=()=>{
-  const r=S.sel;if(!r||r.type!=='hidden')return;const p=S.photos.get(r.pid);if(!p)return;
-  p.excluded=false;S.tray.push(p.id);DB.dirty.add(p.id);S.sel=null;render();toast('Moved back to For later.');
+  const r=S.sel;if(!r||(r.type!=='hidden'&&r.type!=='posted'))return;const p=S.photos.get(r.pid);if(!p)return;
+  p.excluded=false;p.usedPost=false;S.tray.push(p.id);DB.dirty.add(p.id);S.sel=null;render();toast('Moved back to For later.');
 };
 
 /* ---------- posted-photo memory and near-duplicates ---------- */
@@ -890,7 +933,7 @@ function reapplyCats(ids){
 function catchPosted(ids){
   let n=0;
   ids.forEach(id=>{const p=S.photos.get(id);if(!p||p.excluded||!looksPosted(p))return;
-    p.excluded=true;p.usedPost=true;DB.dirty.add(id);const i=S.tray.indexOf(id);if(i>=0)S.tray.splice(i,1);n++});
+    p.usedPost=true;DB.dirty.add(id);const i=S.tray.indexOf(id);if(i>=0)S.tray.splice(i,1);n++});
   return n;
 }
 function isTwin(p,q){if(!p.emb||!q.emb)return false;const c=cos(p.emb,q.emb);return c>=0.95||(Math.abs(p.t-q.t)<=60e3&&c>=0.88)}
@@ -908,24 +951,26 @@ function detectGrid(c){
 }
 async function checkCollage(files){
   await loadRec();if(!REC.ok){toast("Couldn't start photo matching here.");return}
-  let tiles=0,found=0;
+  let tiles=0,found=0,added=0;
   for(const f of files){
     let bmp;try{bmp=await createImageBitmap(f)}catch(e){continue}
     const k=Math.min(1,720/bmp.width),c=document.createElement('canvas');c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);
     c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);bmp.close();
     const[cols,rows]=detectGrid(c);
+    {const pc=document.createElement('canvas'),pk=270/c.width;pc.width=270;pc.height=Math.round(c.height*pk);pc.getContext('2d').drawImage(c,0,0,pc.width,pc.height);
+     S.posted.unshift({id:'pc'+(S.nextId++),url:pc.toDataURL('image/jpeg',0.72),t:Date.now(),tiles:cols*rows});added++}
     for(let r=0;r<rows;r++)for(let q=0;q<cols;q++){
       const x0=Math.round(q*c.width/cols),y0=Math.round(r*c.height/rows),tw=Math.round(c.width/cols),th=Math.round(c.height/rows),pad=Math.round(Math.min(tw,th)*0.03);
       const tc=document.createElement('canvas');tc.width=tw-2*pad;tc.height=th-2*pad;tc.getContext('2d').drawImage(c,x0+pad,y0+pad,tc.width,tc.height,0,0,tc.width,tc.height);
       const e=await embedOf(tc);tiles++;S.used.push({e,t:null});
-      let bp=null,bc=0.86;S.photos.forEach(p=>{if(p.emb&&!p.excluded){const v=cos(p.emb,e);if(v>bc){bc=v;bp=p}}});
-      if(bp){bp.excluded=true;bp.usedPost=true;DB.dirty.add(bp.id);found++;
+      let bp=null,bc=0.86;S.photos.forEach(p=>{if(p.emb&&!p.excluded&&!p.usedPost){const v=cos(p.emb,e);if(v>bc){bc=v;bp=p}}});
+      if(bp){bp.usedPost=true;DB.dirty.add(bp.id);found++;
         const i=S.tray.indexOf(bp.id);if(i>=0)S.tray.splice(i,1);
         S.stories.forEach(s=>{const j=s.slots.indexOf(bp.id);if(j>=0){s.slots[j]=null;s.saved=false}})}
     }
   }
-  render();
-  toast(found?`Found ${found} of ${tiles} photos from that collage. Moved them to Hidden as Used.`:`Checked ${tiles} photos. None of them are in your pool, but they'll be caught if you add them later.`);
+  TAB='done';render();window.scrollTo({top:0});
+  toast(`Added ${added} posted collage${added>1?'s':''} to Done.${found?` ${found} of its photos were in your library and moved to Already posted.`:` None of its photos are in your library yet. They'll be caught if you add them.`}`);
 }
 $('checkBtn').onclick=()=>{loadRec();$('fileCollage').click()};
 $('fileCollage').onchange=e=>{const fs=[...e.target.files];e.target.value='';if(fs.length)checkCollage(fs)};
