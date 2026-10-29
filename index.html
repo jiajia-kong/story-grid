@@ -171,6 +171,8 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
 .groupHead{grid-column:1/-1;margin:6px 0 -14px;font-family:var(--f-serif);font-weight:600;font-size:18px;border-bottom:1px solid var(--hair);padding-bottom:4px}
 .groupHead:first-child{margin-top:0}
 .row .lbl .sub{display:block;font-family:var(--f-cond);font-weight:400;font-size:13px;color:var(--muted)}
+.waitNote{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;border:1px dashed var(--ink);padding:12px 14px}
+.waitNote span{flex:1 1 200px;font-size:16px}
 .row.trips{grid-column:1/-1;align-items:flex-start;flex-direction:column}
 .tripList{display:flex;gap:6px;flex-wrap:wrap}
 .tripChip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--ink);border-radius:4px;padding:3px 4px 3px 10px;font-family:var(--f-cond);font-size:14px}
@@ -299,6 +301,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
       <span class="count" id="count"></span>
     </div>
     <div class="stories" id="stories"></div>
+    <div class="waitNote" id="waitNote" hidden><span id="waitText"></span><button class="primary" id="surpriseBtn2">Surprise me</button></div>
   </section>
 
   <section class="tray" id="savedSec" hidden>
@@ -311,7 +314,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
   </section>
 
   <section class="tray" id="traySec">
-    <div class="secHead"><div class="ttl"><h2>For later</h2></div><div class="add"><span class="count" id="trayCount"></span><button id="selTray">Select</button></div></div>
+    <div class="secHead"><div class="ttl"><h2>For later</h2></div><div class="add"><span class="count" id="trayCount"></span><button id="selTray">Select</button><button class="primary" id="surpriseBtn">Surprise me</button></div></div>
     <div class="trayGrid" id="tray"></div>
   </section>
   <section class="tray" id="hidSec" hidden>
@@ -341,6 +344,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
 <div class="bar" id="mbar" hidden>
   <span id="mText">0 selected</span>
   <button id="mAll">Select all</button>
+  <button id="mMake">Make a collage</button>
   <button id="mNever">Never use</button>
   <button id="mUse">Use again</button>
   <button id="mDel">Delete</button>
@@ -486,11 +490,15 @@ const centroid=ps=>{const c=new Array(6+SEM_D).fill(0);ps.forEach(p=>pvec(p).for
 function meanFeat(ps){const f={lum:0,sat:0,warm:0,hx:0,hy:0,std:0};ps.forEach(p=>{for(const k in f)f[k]+=p.feat[k]/ps.length});return f}
 function moodName(f){
   const hue=(Math.atan2(f.hy,f.hx)*180/Math.PI+360)%360,chroma=Math.hypot(f.hx,f.hy);
-  if(f.lum<0.26)return f.sat>0.4?'Neon nights':'After dark';
-  if(f.sat<0.17&&f.lum>0.55)return 'Snow & soft light';
-  if(chroma>0.06&&hue>65&&hue<170)return 'Greens';
-  if(chroma>0.06&&hue>180&&hue<255&&f.lum>0.42)return 'Blue-sky days';
-  if(f.warm>0.1)return f.lum>0.5?'Warm daylight':'Warm interiors';
+  if(f.lum<0.2)return f.sat>0.38?'Neon nights':'After dark';
+  if(f.lum<0.3)return f.warm>0.05?'Candlelit':'Moody';
+  if(f.sat<0.12)return f.lum>0.6?'Bright & airy':'Monochrome';
+  if(chroma>0.06&&hue>65&&hue<170)return 'Greenery';
+  if(chroma>0.06&&hue>180&&hue<265)return f.lum>0.48?'Blue-sky days':'Blue hour';
+  if(f.warm>0.13&&f.sat>0.33)return f.lum>0.45?'Golden hour':'Warm & rich';
+  if(f.sat>0.42)return 'Vivid pops';
+  if(f.lum>0.62&&f.sat<0.25)return 'Pastel & light';
+  if(f.warm>0.07)return f.lum>0.5?'Warm daylight':'Earthy tones';
   return 'Soft neutrals';
 }
 
@@ -753,7 +761,9 @@ function render(){
     const mH=S.multi&&S.multi.kind==='hidden';if(mH&&S.multi.ids.has(p.id))b.classList.add('pick');
     const im=document.createElement('img');im.src=p.thumbURL;im.alt='';b.appendChild(im);b.onclick=()=>mH?toggleMulti(p.id):tapSlot({type:'hidden',pid:p.id});hg.appendChild(b)});
   hg.classList.toggle('multi',!!(S.multi&&S.multi.kind==='hidden'));
-  if(S.multi){const n=S.multi.ids.size,all=multiPool().length;$('mText').textContent=`${n} selected`;$('mAll').textContent=n===all&&all?'Select none':'Select all';
+  $('mMake').hidden=!(S.multi&&S.multi.kind==='tray');if(S.multi){$('mMake').disabled=S.multi.ids.size<4}
+  {const nL=S.tray.length;$('waitNote').hidden=nL<4||S.samples;$('waitText').textContent=`${nL} photos are waiting in For later.`;$('surpriseBtn').hidden=nL<4}
+  if(S.multi){const n=S.multi.ids.size,all=multiPool().length;$('mText').textContent=n&&n<4&&S.multi.kind==='tray'?`${n} selected \u00b7 pick at least 4 to make a collage`:`${n} selected`;$('mAll').textContent=n===all&&all?'Select none':'Select all';
     $('mNever').hidden=S.multi.kind!=='tray';$('mUse').hidden=S.multi.kind!=='hidden';['mNever','mUse','mDel'].forEach(k=>$(k).disabled=!n);}
   $('mbar').hidden=!S.multi;if(S.multi)$('bar').hidden=true;
   applyTabs();
@@ -983,6 +993,39 @@ $('selTray').onclick=()=>startMulti('tray');
 $('selHid').onclick=()=>startMulti('hidden');
 $('mAll').onclick=()=>{if(!S.multi)return;const all=multiPool();S.multi.ids=S.multi.ids.size===all.length?new Set():new Set(all);render()};
 $('mCancel').onclick=()=>{S.multi=null;render()};
+/* Surprise me: turn everything in For later into collages. Same subject + closest colors first, then any subject by color. Dates are ignored. */
+function surpriseFill(list,n,cap,label){
+  list=[...list];shuffle(list);const rest=[],made=[];
+  while(list.length>=n){
+    const seed=list.shift(),sv=pvec(seed);
+    const near=list.map(p=>({p,d:dist(pvec(p),sv)})).filter(x=>x.d<=cap).sort((a,b)=>a.d-b.d).slice(0,n-1);
+    if(near.length<n-1){rest.push(seed);continue}
+    const pick=[seed,...near.map(x=>x.p)];list=list.filter(p=>!pick.includes(p));pick.sort((a,b)=>a.t-b.t);
+    const st=makeStory(pick.map(p=>p.id),n,'match');S.stories.push(st);made.push(st);
+  }
+  return rest.concat(list);
+}
+function surprise(){
+  const st=settings(),T=VIBE_T[st.vibe],n=st.tiles==='auto'?6:+st.tiles;
+  let pool=S.tray.map(id=>S.photos.get(id)).filter(p=>p&&!p.excluded&&!p.usedPost);
+  if(pool.length<n){toast(`You need at least ${n} photos in For later. Change photos per story in Arrange to use fewer.`);return}
+  const before=S.stories.length;
+  let rest=[];groupBy(pool,famOf).forEach(g=>{rest.push(...surpriseFill(g,n,T*3.2))});
+  rest=surpriseFill(rest,n,T*5);
+  S.tray=rest.map(p=>p.id);S.stories.sort((a,b)=>firstT(a)-firstT(b));S.sel=null;S.multi=null;TAB='stories';render();window.scrollTo({top:0});
+  const made=S.stories.length-before;
+  toast(made?`Made ${made} new collage${made>1?'s':''}. ${rest.length?`${rest.length} photo${rest.length>1?'s':''} still in For later.`:'For later is empty.'} Tap Surprise me again for a different mix.`:"Couldn't find good matches. Try fewer photos per story in Arrange.");
+}
+$('surpriseBtn').onclick=surprise;$('surpriseBtn2').onclick=surprise;
+/* Make a collage from photos you picked in For later. */
+$('mMake').onclick=()=>{
+  if(!S.multi||S.multi.kind!=='tray')return;const ids=[...S.multi.ids].filter(id=>S.tray.includes(id));
+  if(ids.length<4){toast('Pick at least 4 photos.');return}
+  const n=largestFit(ids.length),pick=ids.map(id=>S.photos.get(id)).sort((a,b)=>a.t-b.t).slice(0,n);
+  S.stories.push(makeStory(pick.map(p=>p.id),n,'match'));S.tray=S.tray.filter(id=>!pick.some(p=>p.id===id));
+  S.stories.sort((a,b)=>firstT(a)-firstT(b));S.multi=null;TAB='stories';render();window.scrollTo({top:0});
+  toast(`Made a ${n}-photo collage.${ids.length>n?` ${ids.length-n} extra stayed in For later, since layouts come in 4, 6, 9, 12, 15 or 20.`:''}`);
+};
 $('mNever').onclick=()=>{if(!S.multi)return;const ids=[...S.multi.ids];ids.forEach(id=>{const p=S.photos.get(id);if(!p)return;p.excluded=true;DB.dirty.add(id);const i=S.tray.indexOf(id);if(i>=0)S.tray.splice(i,1)});S.multi=null;render();toast(`${ids.length} moved to Hidden.`)};
 $('mUse').onclick=()=>{if(!S.multi)return;const ids=[...S.multi.ids];ids.forEach(id=>{const p=S.photos.get(id);if(!p)return;p.excluded=false;DB.dirty.add(id);if(!S.tray.includes(id))S.tray.push(id)});S.multi=null;render();toast(`${ids.length} moved to For later.`)};
 $('mDel').onclick=()=>twoTap($('mDel'),'Tap again to delete',()=>{if(!S.multi)return;const ids=[...S.multi.ids];deletePhotos(ids);S.multi=null;render();toast(`Deleted ${ids.length} photo${ids.length>1?'s':''}.`)});
