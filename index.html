@@ -272,6 +272,7 @@ h2{font-family:var(--f-serif);font-weight:750;font-size:28px;line-height:1.1;mar
     <label class="row sw"><span class="lbl">Thin lines between photos</span><input type="checkbox" id="lines" role="switch"></label>
   </div>
   <p class="recStatus" id="recStatus" hidden></p>
+  <p class="recStatus" id="libInfo"></p>
   <p class="recStatus" id="storeInfo"></p>
   <div class="panelFoot">
     <div class="tools">
@@ -558,7 +559,7 @@ function makeStory(ids,n,kind,extra={}){const[c,r]=LAYOUT[n];return{id:'s'+(S.ne
    keepAll=false: keep saved stories, regroup everything else. Returns stories made. */
 function build(keepAll){
   const st=settings(),T=VIBE_T[st.vibe];
-  const kept=keepAll?S.stories:S.stories.filter(s=>s.saved);
+  const kept=keepAll?S.stories:S.stories.filter(s=>s.saved||s.pinned);
   const used=new Set();kept.forEach(s=>s.slots.forEach(id=>{if(id)used.add(id)}));
   let avail=[...S.photos.values()].filter(p=>!used.has(p.id)&&!p.excluded&&!p.usedPost);const before=kept.length;
   const keepers=[];kept.forEach(s=>s.slots.forEach(id=>{const p=S.photos.get(id);if(p)keepers.push(p)}));
@@ -712,14 +713,14 @@ function render(){
     fr.appendChild(cv);drawPreview(cv,st);
     const meta=document.createElement('div');meta.className='meta';
     meta.innerHTML=`<span class="name"></span><span class="when"></span>`;
-    meta.querySelector('.name').textContent=storyName(st);meta.querySelector('.when').textContent=dateLabel(st);
+    meta.querySelector('.name').textContent=storyName(st);meta.querySelector('.when').textContent=(st.pinned&&!st.saved?'Pinned \u00b7 ':'')+dateLabel(st);
     const row=document.createElement('div');row.className='meta';
     row.innerHTML=`<span class="chips"><span class="chip ${st.kind==='mix'?'mix':''}">${st.kind==='mix'?'Contrast mix':'Matched'}</span>${st.saved?'<span class="chip saved">Saved</span>':''}</span><span class="when">${st.n} photos · ${st.cols}×${st.rows}</span>`;
     const act=document.createElement('div');act.className='actions';
     const empty=st.slots.some(id=>!id);
     const del=btn('Delete',()=>twoTap(del,'Tap again to delete',()=>{S.stories=S.stories.filter(x=>x!==st);deletePhotos(st.slots.filter(Boolean));S.sel=null;render()}));
     if(st.saved)act.append(btn('Save again',()=>saveStory(st)),btn('Edit',()=>{st.saved=false;st.slots.forEach(id=>{const p=S.photos.get(id);if(p&&p.usedPost){p.usedPost=false;DB.dirty.add(id)}});S.sel=null;render();toast('Moved back to Stories to edit.')}),del);
-    else act.append(btn('Save',()=>saveStory(st),empty,true),btn('Shuffle',()=>{shuffle(st.slots);st.saved=false;S.sel=null;render()}),btn('Break apart',()=>{st.slots.filter(Boolean).forEach(id=>S.tray.push(id));S.stories=S.stories.filter(x=>x!==st);S.sel=null;render()}),del);
+    else act.append(btn('Save',()=>saveStory(st),empty,true),btn(st.pinned?'Unpin':'Pin',()=>{st.pinned=!st.pinned;render();toast(st.pinned?'Pinned. Reshuffling won\'t touch it.':'Unpinned.')}),btn('Shuffle',()=>{shuffle(st.slots);st.saved=false;S.sel=null;render()}),btn('Break apart',()=>{st.slots.filter(Boolean).forEach(id=>S.tray.push(id));S.stories=S.stories.filter(x=>x!==st);S.sel=null;render()}),del);
     card.append(fr,meta,act);
     (st.saved?sbox:box).appendChild(card);
   });
@@ -761,14 +762,18 @@ function render(){
     const mH=S.multi&&S.multi.kind==='hidden';if(mH&&S.multi.ids.has(p.id))b.classList.add('pick');
     const im=document.createElement('img');im.src=p.thumbURL;im.alt='';b.appendChild(im);b.onclick=()=>mH?toggleMulti(p.id):tapSlot({type:'hidden',pid:p.id});hg.appendChild(b)});
   hg.classList.toggle('multi',!!(S.multi&&S.multi.kind==='hidden'));
-  $('mMake').hidden=!(S.multi&&S.multi.kind==='tray');if(S.multi){$('mMake').disabled=S.multi.ids.size<4}
+  $('mMake').hidden=!(S.multi&&S.multi.kind==='tray');if(S.multi){$('mMake').disabled=S.multi.ids.size<2}
   {const nL=S.tray.length;$('waitNote').hidden=nL<4||S.samples;$('waitText').textContent=`${nL} photos are waiting in For later.`;$('surpriseBtn').hidden=nL<4}
-  if(S.multi){const n=S.multi.ids.size,all=multiPool().length;$('mText').textContent=n&&n<4&&S.multi.kind==='tray'?`${n} selected \u00b7 pick at least 4 to make a collage`:`${n} selected`;$('mAll').textContent=n===all&&all?'Select none':'Select all';
+  if(S.multi){const n=S.multi.ids.size,all=multiPool().length;$('mText').textContent=`${n} selected`;$('mAll').textContent=n===all&&all?'Select none':'Select all';
     $('mNever').hidden=S.multi.kind!=='tray';$('mUse').hidden=S.multi.kind!=='hidden';['mNever','mUse','mDel'].forEach(k=>$(k).disabled=!n);}
   $('mbar').hidden=!S.multi;if(S.multi)$('bar').hidden=true;
   applyTabs();
+  {const inS=new Set();S.stories.forEach(s=>{if(!s.saved)s.slots.forEach(id=>{if(id)inS.add(id)})});
+   const ps=[...S.photos.values()],dup=S.tray.filter(id=>{const p=S.photos.get(id);return p&&p.twin}).length;
+   const posted=ps.filter(p=>p.usedPost&&!p.excluded&&!inS.has(p.id)).length,never=ps.filter(p=>p.excluded).length;
+   $('libInfo').textContent=ps.length?`Your ${ps.length} photos: ${inS.size} in stories \u00b7 ${S.tray.length} for later${dup?` (${dup} near-duplicates)`:''} \u00b7 ${posted} already posted \u00b7 ${never} never use`:''}
   const sp=S.sel&&S.photos.get(getRef(S.sel));$('catSel').hidden=!sp;if(sp)$('catSel').value=catOf(sp);
-  const gaps=S.stories.reduce((n,s)=>n+s.slots.filter(x=>!x).length,0);$('remixBtn').hidden=!gaps;document.querySelector('.toolbar').classList.toggle('gaps',gaps>0);$('remixBtn').textContent=`Fill ${gaps} gap${gaps>1?'s':''}`;$('regroupBtn').hidden=!S.photos.size;
+  const gaps=S.stories.reduce((n,s)=>n+(s.pinned||s.saved?0:s.slots.filter(x=>!x).length),0);$('remixBtn').hidden=!gaps;document.querySelector('.toolbar').classList.toggle('gaps',gaps>0);$('remixBtn').textContent=`Fill ${gaps} gap${gaps>1?'s':''}`;$('regroupBtn').hidden=!S.photos.size;
   $('clearSaved').hidden=!S.stories.some(s=>s.saved);
   schedulePersist();
 }
@@ -844,6 +849,12 @@ async function init(){
       if(state){S.posted=state.posted||[];S.used=state.used||[];S.trips=state.trips||[];S.manualCats=state.manualCats||[];S.nextId=Math.max(state.nextId||1,S.nextId);S.stories=(state.stories||[]).map(s=>({...s,slots:s.slots.map(id=>S.photos.has(id)?id:null)}));S.tray=(state.tray||[]).filter(id=>S.photos.has(id)&&!S.photos.get(id).excluded)}
       const placed=new Set(S.tray);S.stories.forEach(s=>s.slots.forEach(id=>{if(id)placed.add(id)}));
       S.photos.forEach(p=>{if(p.usedPost&&p.excluded){p.excluded=false;DB.dirty.add(p.id)}});
+      /* Re-check photos the older, looser matching flagged as posted; put mistaken ones back in For later. */
+      {const inSaved=new Set();S.stories.forEach(s=>{if(s.saved)s.slots.forEach(id=>{if(id)inSaved.add(id)})});let freed=0;
+       S.photos.forEach(p=>{if(!p.usedPost||inSaved.has(p.id)||!p.emb)return;
+         const still=S.used.some(u=>{const c=cos(u.e,p.emb);return c>=0.965||(u.t===null&&c>=0.9)||(u.t&&Math.abs(u.t-p.t)<=60e3&&c>=0.92)});
+         if(!still){p.usedPost=false;DB.dirty.add(p.id);freed++}});
+       if(freed)setTimeout(()=>toast(`Moved ${freed} photo${freed>1?'s':''} that were wrongly marked as posted back to For later.`),800)}
       S.tray=S.tray.filter(id=>!S.photos.get(id).usedPost);
       S.photos.forEach((p,id)=>{if(!placed.has(id)&&!p.excluded&&!p.usedPost)S.tray.push(id)});
       render();
@@ -891,6 +902,7 @@ function timeOk(p,ps,mode){
 function fillEmpty(){
   const st=settings();let filled=0,unfilled=0;
   for(const story of S.stories){
+    if(story.pinned||story.saved)continue;
     const empties=story.slots.map((id,i)=>id?-1:i).filter(i=>i>=0);if(!empties.length)continue;
     const ps=story.slots.filter(Boolean).map(id=>S.photos.get(id)).filter(Boolean);
     if(!ps.length){unfilled+=empties.length;continue}
@@ -907,7 +919,7 @@ function fillEmpty(){
   return{filled,unfilled};
 }
 $('remixBtn').onclick=()=>{
-  const empty=S.stories.reduce((t,s)=>t+s.slots.filter(id=>!id).length,0);
+  const empty=S.stories.reduce((t,s)=>t+(s.pinned||s.saved?0:s.slots.filter(id=>!id).length),0);
   if(!empty){toast('No empty spots to fill.');return}
   const{filled,unfilled}=fillEmpty();S.sel=null;render();
   toast(`${filled?`Filled ${filled} spot${filled>1?'s':''}.`:''}${unfilled?` ${unfilled} still empty. Nothing in For later matches.`:''}`.trim());
@@ -931,7 +943,7 @@ function rememberPosted(st){
 }
 function looksPosted(p){
   if(!p.emb)return false;
-  for(const u of S.used){const c=cos(u.e,p.emb);if(c>=0.93||(u.t&&Math.abs(u.t-p.t)<=60e3&&c>=0.85))return true}
+  for(const u of S.used){const c=cos(u.e,p.emb);if(c>=0.965||(u.t&&Math.abs(u.t-p.t)<=60e3&&c>=0.92))return true}
   return false;
 }
 /* New photos that match something already posted go straight to Hidden, marked Used. */
@@ -946,7 +958,7 @@ function catchPosted(ids){
     p.usedPost=true;DB.dirty.add(id);const i=S.tray.indexOf(id);if(i>=0)S.tray.splice(i,1);n++});
   return n;
 }
-function isTwin(p,q){if(!p.emb||!q.emb)return false;const c=cos(p.emb,q.emb);return c>=0.95||(Math.abs(p.t-q.t)<=60e3&&c>=0.88)}
+function isTwin(p,q){if(!p.emb||!q.emb)return false;const c=cos(p.emb,q.emb);return c>=0.97||(Math.abs(p.t-q.t)<=60e3&&c>=0.93)}
 /* Read a posted collage, find its tiles, and match each tile to photos in the pool. */
 function detectGrid(c){
   const w=c.width,h=c.height,d=c.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
@@ -973,7 +985,7 @@ async function checkCollage(files){
       const x0=Math.round(q*c.width/cols),y0=Math.round(r*c.height/rows),tw=Math.round(c.width/cols),th=Math.round(c.height/rows),pad=Math.round(Math.min(tw,th)*0.03);
       const tc=document.createElement('canvas');tc.width=tw-2*pad;tc.height=th-2*pad;tc.getContext('2d').drawImage(c,x0+pad,y0+pad,tc.width,tc.height,0,0,tc.width,tc.height);
       const e=await embedOf(tc);tiles++;S.used.push({e,t:null});
-      let bp=null,bc=0.86;S.photos.forEach(p=>{if(p.emb&&!p.excluded&&!p.usedPost){const v=cos(p.emb,e);if(v>bc){bc=v;bp=p}}});
+      let bp=null,bc=0.9;S.photos.forEach(p=>{if(p.emb&&!p.excluded&&!p.usedPost){const v=cos(p.emb,e);if(v>bc){bc=v;bp=p}}});
       if(bp){bp.usedPost=true;DB.dirty.add(bp.id);found++;
         const i=S.tray.indexOf(bp.id);if(i>=0)S.tray.splice(i,1);
         S.stories.forEach(s=>{const j=s.slots.indexOf(bp.id);if(j>=0){s.slots[j]=null;s.saved=false}})}
@@ -1020,11 +1032,12 @@ $('surpriseBtn').onclick=surprise;$('surpriseBtn2').onclick=surprise;
 /* Make a collage from photos you picked in For later. */
 $('mMake').onclick=()=>{
   if(!S.multi||S.multi.kind!=='tray')return;const ids=[...S.multi.ids].filter(id=>S.tray.includes(id));
-  if(ids.length<4){toast('Pick at least 4 photos.');return}
-  const n=largestFit(ids.length),pick=ids.map(id=>S.photos.get(id)).sort((a,b)=>a.t-b.t).slice(0,n);
-  S.stories.push(makeStory(pick.map(p=>p.id),n,'match'));S.tray=S.tray.filter(id=>!pick.some(p=>p.id===id));
+  if(ids.length<2){toast('Pick at least 2 photos.');return}
+  const n=SIZES.find(s=>s>=ids.length)||20,pick=ids.map(id=>S.photos.get(id)).sort((a,b)=>a.t-b.t).slice(0,n);
+  const slots=pick.map(p=>p.id);while(slots.length<n)slots.push(null);
+  const st=makeStory(slots,n,'match',{pinned:true});S.stories.push(st);S.tray=S.tray.filter(id=>!pick.some(p=>p.id===id));
   S.stories.sort((a,b)=>firstT(a)-firstT(b));S.multi=null;TAB='stories';render();window.scrollTo({top:0});
-  toast(`Made a ${n}-photo collage.${ids.length>n?` ${ids.length-n} extra stayed in For later, since layouts come in 4, 6, 9, 12, 15 or 20.`:''}`);
+  const gaps=n-pick.length;toast(`Made a pinned ${n}-photo collage.${gaps?` ${gaps} empty spot${gaps>1?'s':''} to fill. Tap + when you find the right photo.`:''}`);
 };
 $('mNever').onclick=()=>{if(!S.multi)return;const ids=[...S.multi.ids];ids.forEach(id=>{const p=S.photos.get(id);if(!p)return;p.excluded=true;DB.dirty.add(id);const i=S.tray.indexOf(id);if(i>=0)S.tray.splice(i,1)});S.multi=null;render();toast(`${ids.length} moved to Hidden.`)};
 $('mUse').onclick=()=>{if(!S.multi)return;const ids=[...S.multi.ids];ids.forEach(id=>{const p=S.photos.get(id);if(!p)return;p.excluded=false;DB.dirty.add(id);if(!S.tray.includes(id))S.tray.push(id)});S.multi=null;render();toast(`${ids.length} moved to For later.`)};
