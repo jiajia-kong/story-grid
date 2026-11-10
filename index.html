@@ -525,6 +525,12 @@ function partitionBy(ps,mode){
   const key=p=>{const d=new Date(p.t-(mode==='day'?5*3600e3:0));return mode==='day'?`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`:`${d.getFullYear()}-${d.getMonth()}`};
   const m=new Map();s.forEach(p=>{const k=key(p);if(!m.has(k))m.set(k,[]);m.get(k).push(p)});return [...m.values()];
 }
+/* A moment is one visit: photos taken within 3 hours of each other, and within 2 km when both know where they were taken. */
+function momentsOf(list){
+  const s=[...list].sort((a,b)=>a.t-b.t),out=[];let cur=[];
+  s.forEach(p=>{const q=cur[cur.length-1];if(q&&(p.t-q.t>3*3600e3||(hasGeo(p)&&hasGeo(q)&&kmBetween(p,q)>2))){out.push(cur);cur=[]}cur.push(p)});
+  if(cur.length)out.push(cur);return out;
+}
 const PLACE_KM=150,OUTING_GAP=24*3600e3,OUTING_KM=PLACE_KM;
 /* Photos far apart (another city or country) never share a collage, even inside one trip. */
 function splitByPlace(g){
@@ -565,7 +571,13 @@ function build(keepAll){
   const keepers=[];kept.forEach(s=>s.slots.forEach(id=>{const p=S.photos.get(id);if(p)keepers.push(p)}));
   const twins=[];avail=avail.sort((a,b)=>a.t-b.t).filter(p=>{const tw=keepers.find(q=>isTwin(p,q));p.twin=tw?tw.id:null;if(tw){twins.push(p);return false}keepers.push(p);return true});
   S.stories=kept.slice();S.tray=[];S.sel=null;
-  for(const tpart of partition(avail,st.time))for(const fam of groupBy(tpart,p=>st.cats==='off'?'all':famOf(p))){
+  const nMoment=st.tiles==='auto'?6:+st.tiles;
+  for(const tpart0 of partition(avail,st.time)){
+    /* 1. Same outing first: photos from one visit become collages together, matched by look, whatever their subject. */
+    const tpart=[];
+    for(const m of momentsOf(tpart0)){if(m.length>=nMoment)tpart.push(...closestFill(m,st,T,7));else tpart.push(...m)}
+    /* 2. Leftovers from small outings: grouped by subject and color across the month or trip. */
+    for(const fam of groupBy(tpart,p=>st.cats==='off'?'all':famOf(p))){
     for(const part of(st.cats==='exact'?groupBy(fam,catOf):[fam])){
     const pool=[];
     for(const cl of cluster(part,T)){
@@ -582,14 +594,14 @@ function build(keepAll){
     if(st.mix)rest=contrastFill(rest,st);
     rest=closestFill(rest,st,T);
     rest.forEach(p=>S.tray.push(p.id));
-  }}
+  }}}
   twins.forEach(p=>S.tray.push(p.id));S.lastTwins=twins.length;
   S.stories.sort((a,b)=>firstT(a)-firstT(b));
   return S.stories.length-before;
 }
 /* Leftovers from the same subject and outing become stories built around their closest tone matches. */
-function closestFill(list,st,T){
-  const cap=T*2.6,rest=[];list=[...list].sort((a,b)=>a.t-b.t);
+function closestFill(list,st,T,capMul=2.6){
+  const cap=T*capMul,rest=[];list=[...list].sort((a,b)=>a.t-b.t);
   while(list.length){
     const n=st.tiles==='auto'?largestFit(list.length):+st.tiles;
     if(!n||list.length<n){rest.push(...list);break}
@@ -1022,7 +1034,8 @@ function surprise(){
   let pool=S.tray.map(id=>S.photos.get(id)).filter(p=>p&&!p.excluded&&!p.usedPost);
   if(pool.length<n){toast(`You need at least ${n} photos in For later. Change photos per story in Arrange to use fewer.`);return}
   const before=S.stories.length;
-  let rest=[];groupBy(pool,famOf).forEach(g=>{rest.push(...surpriseFill(g,n,T*3.2))});
+  let rest=[];momentsOf(pool).forEach(m=>{rest.push(...(m.length>=n?surpriseFill(m,n,T*7):m))});
+  const r2=[];groupBy(rest,famOf).forEach(g=>{r2.push(...surpriseFill(g,n,T*3.2))});rest=r2;
   rest=surpriseFill(rest,n,T*5);
   S.tray=rest.map(p=>p.id);S.stories.sort((a,b)=>firstT(a)-firstT(b));S.sel=null;S.multi=null;TAB='stories';render();window.scrollTo({top:0});
   const made=S.stories.length-before;
